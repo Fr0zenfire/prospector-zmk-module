@@ -81,3 +81,17 @@ config PROSPECTOR_LAYER_NAME_UPPERCASE
     default y
     help
       When enabled, layer names will be converted to uppercase for display.
+
+config PROSPECTOR_DISPLAY_SLEEP_ENABLE
+    bool "Turn off display on idle"
+    default n
+
+config PROSPECTOR_DISPLAY_IDLE_TIMEOUT_MS
+    int "Display idle timeout in ms"
+    default 30000
+    depends on PROSPECTOR_DISPLAY_SLEEP_ENABLE
+
+config PROSPECTOR_DISPLAY_SLEEP_USE_PM
+    bool "Use Zephyr PM to suspend the display (SLEEP_IN)"
+    default n
+    depends on PROSPECTOR_DISPLAY_SLEEP_ENABLE && PM_DEVICE
