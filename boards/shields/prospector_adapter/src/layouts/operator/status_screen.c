@@ -23,8 +23,8 @@ static uint32_t last_frame_count = 0;
 static int64_t last_fps_time_ms = 0;
 
 static void fps_timer_cb(lv_timer_t *timer) {
-    lv_obj_t *label = (lv_obj_t *)timer->user_data;
-    if (!label) return;
+    ARG_UNUSED(timer);
+    if (!fps_label) return;
 
     int64_t now = k_uptime_get();
     int64_t elapsed = now - last_fps_time_ms;
@@ -39,7 +39,7 @@ static void fps_timer_cb(lv_timer_t *timer) {
 
     char buf[16];
     snprintf(buf, sizeof(buf), "%u FPS", fps);
-    lv_label_set_text(label, buf);
+    lv_label_set_text(fps_label, buf);
 }
 
 static void boot_anim_tx(void *obj, int32_t v) {
