@@ -30,6 +30,7 @@ static int on_brightness_inc_pressed(struct zmk_behavior_binding *binding,
 #if IS_ENABLED(CONFIG_PROSPECTOR_DISPLAY_SLEEP_ENABLE)
     if (prospector_display_is_sleeping()) {
         prospector_display_wake_up();
+        return ZMK_BEHAVIOR_OPAQUE;
     }
 #endif
     prospector_adjust_brightness(CONFIG_PROSPECTOR_BRIGHTNESS_STEP);
@@ -73,6 +74,7 @@ static int on_brightness_dec_pressed(struct zmk_behavior_binding *binding,
 #if IS_ENABLED(CONFIG_PROSPECTOR_DISPLAY_SLEEP_ENABLE)
     if (prospector_display_is_sleeping()) {
         prospector_display_wake_up();
+        return ZMK_BEHAVIOR_OPAQUE;
     }
 #endif
     prospector_adjust_brightness(-CONFIG_PROSPECTOR_BRIGHTNESS_STEP);
