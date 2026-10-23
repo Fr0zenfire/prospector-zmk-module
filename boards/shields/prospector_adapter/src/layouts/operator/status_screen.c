@@ -31,7 +31,7 @@ static void start_boot_slide(lv_obj_t *obj, int32_t off_x, int32_t off_y, uint32
         lv_anim_init(&a);
         lv_anim_set_var(&a, obj);
         lv_anim_set_values(&a, off_x, 0);
-        lv_anim_set_duration(&a, 380);
+        lv_anim_set_duration(&a, 340);
         lv_anim_set_delay(&a, delay_ms);
         lv_anim_set_exec_cb(&a, boot_anim_tx);
         lv_anim_set_path_cb(&a, lv_anim_path_overshoot);
@@ -43,7 +43,7 @@ static void start_boot_slide(lv_obj_t *obj, int32_t off_x, int32_t off_y, uint32
         lv_anim_init(&a);
         lv_anim_set_var(&a, obj);
         lv_anim_set_values(&a, off_y, 0);
-        lv_anim_set_duration(&a, 380);
+        lv_anim_set_duration(&a, 340);
         lv_anim_set_delay(&a, delay_ms);
         lv_anim_set_exec_cb(&a, boot_anim_ty);
         lv_anim_set_path_cb(&a, lv_anim_path_overshoot);
@@ -77,11 +77,11 @@ lv_obj_t *zmk_display_status_screen() {
     lv_obj_t *out_obj = zmk_widget_output_obj(&output_widget);
     lv_obj_set_pos(out_obj, 148, 170);
 
-    start_boot_slide(mod_obj, 0, -45, 0);
-    start_boot_slide(wpm_obj, -280, 0, 35);
-    start_boot_slide(layer_obj, 280, 0, 70);
-    start_boot_slide(bat_obj, 0, 85, 105);
-    start_boot_slide(out_obj, 0, 85, 140);
+    start_boot_slide(mod_obj, 0, -40, 0);
+    start_boot_slide(wpm_obj, -140, 0, 32);
+    start_boot_slide(layer_obj, 140, 0, 64);
+    start_boot_slide(bat_obj, 0, 75, 96);
+    start_boot_slide(out_obj, 0, 75, 128);
 
     return screen;
 }

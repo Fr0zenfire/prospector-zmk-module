@@ -32,13 +32,13 @@ static const struct device *pwm_leds_dev;
 #define DEFAULT_SAVED_BRIGHTNESS 80
 #endif
 
-#define SLEEP_ANIM_DURATION_MS 280
-#define SLEEP_ANIM_STAGGER_MS  25
-#define SLEEP_TOTAL_MS         400
+#define SLEEP_ANIM_DURATION_MS 260
+#define SLEEP_ANIM_STAGGER_MS  24
+#define SLEEP_TOTAL_MS         380
 
-#define WAKE_ANIM_DURATION_MS  380
-#define WAKE_ANIM_STAGGER_MS   35
-#define FADE_TOTAL_MS          340
+#define WAKE_ANIM_DURATION_MS  340
+#define WAKE_ANIM_STAGGER_MS   32
+#define FADE_TOTAL_MS          320
 
 static struct k_work_delayable idle_work;
 static struct k_work_delayable bl_fade_work;
@@ -89,23 +89,23 @@ static void get_child_anim_offsets(int index, int32_t *off_x, int32_t *off_y) {
     switch (index) {
     case 0: /* Top bar (modifiers) -> slide in/out from top */
         *off_x = 0;
-        *off_y = -45;
+        *off_y = -40;
         break;
     case 1: /* Upper-middle (WPM meter) -> slide in/out from left */
-        *off_x = -280;
+        *off_x = -140;
         *off_y = 0;
         break;
     case 2: /* Lower-middle (Layer bar) -> slide in/out from right */
-        *off_x = 280;
+        *off_x = 140;
         *off_y = 0;
         break;
     case 3: /* Bottom-left (Battery circles) -> pop up / drop down */
         *off_x = 0;
-        *off_y = 85;
+        *off_y = 75;
         break;
     default: /* Bottom-right (Output status) & others -> pop up / drop down */
         *off_x = 0;
-        *off_y = 85;
+        *off_y = 75;
         break;
     }
 }
@@ -133,12 +133,12 @@ static void bl_fade_work_handler(struct k_work *work) {
         span = 10;
     }
 
-    int16_t step = (span > 22) ? ((span + 11) / 22) : 1;
+    int16_t step = (span > 30) ? ((span + 15) / 30) : 1;
     int32_t tick_ms = (FADE_TOTAL_MS * step) / span;
-    if (tick_ms < 12) {
-        tick_ms = 12;
-    } else if (tick_ms > 50) {
-        tick_ms = 50;
+    if (tick_ms < 10) {
+        tick_ms = 10;
+    } else if (tick_ms > 40) {
+        tick_ms = 40;
     }
 
     if (current_bl_level < target_bl_level) {

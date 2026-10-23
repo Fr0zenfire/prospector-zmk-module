@@ -21,8 +21,8 @@ static int prev_active_bars = 0;
 static int peak_position = 0;
 static int peak_hold_counter = 0;
 static int peak_decay_counter = 0;
-static const float smoothing_factor_up = 0.3f;
-static const float smoothing_factor_down = 0.05f;
+static const float smoothing_factor_up = 0.18f;
+static const float smoothing_factor_down = 0.03f;
 
 struct wpm_meter_state {
     uint8_t wpm;
@@ -91,11 +91,11 @@ static void wpm_smooth_work_handler(struct k_work *work) {
         peak_decay_counter = 0;
         peak_changed = true;
     } else if (peak_position > active_bars) {
-        if (peak_hold_counter < 90) {
+        if (peak_hold_counter < 180) {
             peak_hold_counter++;
         } else {
             peak_decay_counter++;
-            if (peak_decay_counter >= 18) {
+            if (peak_decay_counter >= 36) {
                 peak_position--;
                 peak_decay_counter = 0;
                 peak_changed = true;
@@ -108,7 +108,7 @@ static void wpm_smooth_work_handler(struct k_work *work) {
     }
 
     if (!at_target || peak_position > active_bars) {
-        k_work_schedule(&wpm_smooth_work, K_MSEC(33));
+        k_work_schedule(&wpm_smooth_work, K_MSEC(16));
     }
 }
 
