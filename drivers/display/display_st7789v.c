@@ -147,6 +147,8 @@ static int st7789v_set_mem_area(const struct device *dev, const uint16_t x,
 	return st7789v_transmit(dev, ST7789V_CMD_RASET, (uint8_t *)&spi_data[0], 4);
 }
 
+volatile uint32_t prospector_frame_count = 0;
+
 static int st7789v_write(const struct device *dev,
 			 const uint16_t x,
 			 const uint16_t y,
@@ -210,6 +212,8 @@ static int st7789v_write(const struct device *dev,
 
 		write_data_start += (desc->pitch * ST7789V_PIXEL_SIZE);
 	}
+
+	prospector_frame_count++;
 
 	return ret;
 }

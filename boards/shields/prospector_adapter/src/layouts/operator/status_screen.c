@@ -1,4 +1,6 @@
 #include <lvgl.h>
+#include <stdio.h>
+#include <zephyr/kernel.h>
 
 #include "modifier_indicator.h"
 #include "wpm_meter.h"
@@ -8,11 +10,37 @@
 
 #include <fonts.h>
 
+extern volatile uint32_t prospector_frame_count;
+
 static struct zmk_widget_modifier_indicator modifier_indicator_widget;
 static struct zmk_widget_wpm_meter wpm_meter_widget;
 static struct zmk_widget_layer_display layer_display_widget;
 static struct zmk_widget_battery_circles battery_circles_widget;
 static struct zmk_widget_output output_widget;
+
+static lv_obj_t *fps_label;
+static uint32_t last_frame_count = 0;
+static int64_t last_fps_time_ms = 0;
+
+static void fps_timer_cb(lv_timer_t *timer) {
+    lv_obj_t *label = (lv_obj_t *)timer->user_data;
+    if (!label) return;
+
+    int64_t now = k_uptime_get();
+    int64_t elapsed = now - last_fps_time_ms;
+    if (elapsed < 200) return;
+
+    uint32_t current_frames = prospector_frame_count;
+    uint32_t frames_diff = current_frames - last_frame_count;
+    uint32_t fps = (uint32_t)((frames_diff * 1000ULL) / (uint64_t)elapsed);
+
+    last_frame_count = current_frames;
+    last_fps_time_ms = now;
+
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%u FPS", fps);
+    lv_label_set_text(label, buf);
+}
 
 static void boot_anim_tx(void *obj, int32_t v) {
     lv_obj_set_style_translate_x((lv_obj_t *)obj, (lv_coord_t)v, LV_PART_MAIN);
@@ -76,6 +104,18 @@ lv_obj_t *zmk_display_status_screen() {
     zmk_widget_output_init(&output_widget, screen);
     lv_obj_t *out_obj = zmk_widget_output_obj(&output_widget);
     lv_obj_set_pos(out_obj, 148, 170);
+
+    /* Diagnostic FPS counter */
+    fps_label = lv_label_create(screen);
+    lv_label_set_text(fps_label, "-- FPS");
+    lv_obj_set_style_text_font(fps_label, &FG_Medium_20, LV_PART_MAIN);
+    lv_obj_set_style_text_color(fps_label, lv_color_hex(0x00FF90), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(fps_label, LV_OPA_TRANSP, LV_PART_MAIN);
+    lv_obj_set_pos(fps_label, 195, 218);
+
+    last_frame_count = prospector_frame_count;
+    last_fps_time_ms = k_uptime_get();
+    lv_timer_create(fps_timer_cb, 500, fps_label);
 
     start_boot_slide(mod_obj, 0, -40, 0);
     start_boot_slide(wpm_obj, -140, 0, 32);
