@@ -64,14 +64,14 @@ static void wpm_meter_render(int active_bars) {
         char wpm_text[4];
         snprintf(wpm_text, sizeof(wpm_text), "%d", (int)(displayed_wpm + 0.5f));
         lv_label_set_text(widget->wpm_label, wpm_text);
+
+        lv_obj_invalidate(widget->obj);
     }
 }
 
 static void wpm_smooth_work_handler(struct k_work *work) {
     float diff = target_wpm - displayed_wpm;
-    bool at_target = (diff > -0.5f && diff < 0.5f);
-
-    int old_int = (int)(displayed_wpm + 0.5f);
+    bool at_target = (diff > -0.3f && diff < 0.3f);
 
     if (at_target) {
         displayed_wpm = target_wpm;
@@ -103,9 +103,7 @@ static void wpm_smooth_work_handler(struct k_work *work) {
         }
     }
 
-    if (old_int != new_int || peak_changed) {
-        wpm_meter_render(active_bars);
-    }
+    wpm_meter_render(active_bars);
 
     if (!at_target || peak_position > active_bars) {
         k_work_schedule(&wpm_smooth_work, K_MSEC(16));

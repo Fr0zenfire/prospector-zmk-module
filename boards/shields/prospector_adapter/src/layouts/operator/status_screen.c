@@ -10,7 +10,8 @@
 
 #include <fonts.h>
 
-extern volatile uint32_t prospector_frame_count;
+extern volatile uint32_t prospector_instant_fps;
+extern volatile int64_t prospector_last_frame_time_ms;
 
 static struct zmk_widget_modifier_indicator modifier_indicator_widget;
 static struct zmk_widget_wpm_meter wpm_meter_widget;
@@ -19,27 +20,21 @@ static struct zmk_widget_battery_circles battery_circles_widget;
 static struct zmk_widget_output output_widget;
 
 static lv_obj_t *fps_label;
-static uint32_t last_frame_count = 0;
-static int64_t last_fps_time_ms = 0;
 
 static void fps_timer_cb(lv_timer_t *timer) {
     ARG_UNUSED(timer);
     if (!fps_label) return;
 
     int64_t now = k_uptime_get();
-    int64_t elapsed = now - last_fps_time_ms;
-    if (elapsed < 200) return;
-
-    uint32_t current_frames = prospector_frame_count;
-    uint32_t frames_diff = current_frames - last_frame_count;
-    uint32_t fps = (uint32_t)((frames_diff * 1000ULL) / (uint64_t)elapsed);
-
-    last_frame_count = current_frames;
-    last_fps_time_ms = now;
-
-    char buf[16];
-    snprintf(buf, sizeof(buf), "%u FPS", fps);
-    lv_label_set_text(fps_label, buf);
+    if (now - prospector_last_frame_time_ms > 350) {
+        lv_label_set_text(fps_label, "-- FPS");
+    } else {
+        uint32_t fps = prospector_instant_fps;
+        if (fps == 0) fps = 60;
+        char buf[16];
+        snprintf(buf, sizeof(buf), "%u FPS", (unsigned int)fps);
+        lv_label_set_text(fps_label, buf);
+    }
 }
 
 static void boot_anim_tx(void *obj, int32_t v) {
@@ -113,9 +108,7 @@ lv_obj_t *zmk_display_status_screen() {
     lv_obj_set_style_bg_opa(fps_label, LV_OPA_TRANSP, LV_PART_MAIN);
     lv_obj_set_pos(fps_label, 195, 218);
 
-    last_frame_count = prospector_frame_count;
-    last_fps_time_ms = k_uptime_get();
-    lv_timer_create(fps_timer_cb, 500, fps_label);
+    lv_timer_create(fps_timer_cb, 120, NULL);
 
     start_boot_slide(mod_obj, 0, -40, 0);
     start_boot_slide(wpm_obj, -140, 0, 32);

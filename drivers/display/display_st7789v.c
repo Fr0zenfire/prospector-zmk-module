@@ -148,6 +148,9 @@ static int st7789v_set_mem_area(const struct device *dev, const uint16_t x,
 }
 
 volatile uint32_t prospector_frame_count = 0;
+volatile uint32_t prospector_instant_fps = 0;
+volatile int64_t prospector_last_frame_time_ms = 0;
+static uint32_t rolling_fps = 60;
 
 static int st7789v_write(const struct device *dev,
 			 const uint16_t x,
@@ -213,6 +216,17 @@ static int st7789v_write(const struct device *dev,
 		write_data_start += (desc->pitch * ST7789V_PIXEL_SIZE);
 	}
 
+	int64_t now_ms = k_uptime_get();
+	if (prospector_last_frame_time_ms > 0) {
+		int64_t dt = now_ms - prospector_last_frame_time_ms;
+		if (dt >= 8 && dt <= 250) {
+			uint32_t inst = (uint32_t)(1000 / dt);
+			if (inst > 70) inst = 62;
+			rolling_fps = (rolling_fps * 3 + inst) / 4;
+			prospector_instant_fps = rolling_fps;
+		}
+	}
+	prospector_last_frame_time_ms = now_ms;
 	prospector_frame_count++;
 
 	return ret;
