@@ -10,14 +10,9 @@
 
 #include <fonts.h>
 
+#if IS_ENABLED(CONFIG_PROSPECTOR_FPS_MONITOR)
 extern volatile uint32_t prospector_instant_fps;
 extern volatile int64_t prospector_last_frame_time_ms;
-
-static struct zmk_widget_modifier_indicator modifier_indicator_widget;
-static struct zmk_widget_wpm_meter wpm_meter_widget;
-static struct zmk_widget_layer_display layer_display_widget;
-static struct zmk_widget_battery_circles battery_circles_widget;
-static struct zmk_widget_output output_widget;
 
 static lv_obj_t *fps_label;
 
@@ -36,6 +31,13 @@ static void fps_timer_cb(lv_timer_t *timer) {
         lv_label_set_text(fps_label, buf);
     }
 }
+#endif
+
+static struct zmk_widget_modifier_indicator modifier_indicator_widget;
+static struct zmk_widget_wpm_meter wpm_meter_widget;
+static struct zmk_widget_layer_display layer_display_widget;
+static struct zmk_widget_battery_circles battery_circles_widget;
+static struct zmk_widget_output output_widget;
 
 static void boot_anim_tx(void *obj, int32_t v) {
     lv_obj_set_style_translate_x((lv_obj_t *)obj, (lv_coord_t)v, LV_PART_MAIN);
@@ -57,7 +59,8 @@ static void start_boot_slide(lv_obj_t *obj, int32_t off_x, int32_t off_y, uint32
         lv_anim_set_duration(&a, 340);
         lv_anim_set_delay(&a, delay_ms);
         lv_anim_set_exec_cb(&a, boot_anim_tx);
-        lv_anim_set_path_cb(&a, lv_anim_path_overshoot);
+        lv_anim_path_cb_t path = lv_anim_path_overshoot;
+        lv_anim_set_path_cb(&a, path);
         lv_anim_start(&a);
     }
 
@@ -69,7 +72,8 @@ static void start_boot_slide(lv_obj_t *obj, int32_t off_x, int32_t off_y, uint32
         lv_anim_set_duration(&a, 340);
         lv_anim_set_delay(&a, delay_ms);
         lv_anim_set_exec_cb(&a, boot_anim_ty);
-        lv_anim_set_path_cb(&a, lv_anim_path_overshoot);
+        lv_anim_path_cb_t path = lv_anim_path_overshoot;
+        lv_anim_set_path_cb(&a, path);
         lv_anim_start(&a);
     }
 }
@@ -100,6 +104,7 @@ lv_obj_t *zmk_display_status_screen() {
     lv_obj_t *out_obj = zmk_widget_output_obj(&output_widget);
     lv_obj_set_pos(out_obj, 148, 170);
 
+#if IS_ENABLED(CONFIG_PROSPECTOR_FPS_MONITOR)
     /* Diagnostic FPS counter */
     fps_label = lv_label_create(screen);
     lv_label_set_text(fps_label, "-- FPS");
@@ -109,6 +114,7 @@ lv_obj_t *zmk_display_status_screen() {
     lv_obj_set_pos(fps_label, 195, 218);
 
     lv_timer_create(fps_timer_cb, 120, NULL);
+#endif
 
     start_boot_slide(mod_obj, 0, -40, 0);
     start_boot_slide(wpm_obj, -140, 0, 32);

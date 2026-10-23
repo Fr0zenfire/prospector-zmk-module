@@ -112,3 +112,9 @@ config PROSPECTOR_DISPLAY_SLEEP_USE_PM
     bool "Use Zephyr PM to suspend the display (SLEEP_IN)"
     default n
     depends on PROSPECTOR_DISPLAY_SLEEP_ENABLE && PM_DEVICE
+
+config PROSPECTOR_FPS_MONITOR
+    bool "Show real-time FPS diagnostic counter on screen"
+    default n
+    help
+      When enabled, displays a real-time hardware FPS counter on the status screen.
