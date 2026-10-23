@@ -13,6 +13,10 @@ LOG_MODULE_REGISTER(display_idle, CONFIG_ZMK_LOG_LEVEL);
 #include <zephyr/pm/device.h>
 #endif
 
+#if defined(CONFIG_PROSPECTOR_BRIGHTNESS_MANUAL)
+#include "brightness.h"
+#endif
+
 #include "prospector/display_power.h"
 
 static const struct device *display_dev;
@@ -69,7 +73,7 @@ static void display_go_to_sleep(void) {
     prospector_display_set_sleeping(true);
 }
 
-static void display_wake_up(void) {
+void prospector_display_wake_up(void) {
     if (!prospector_display_is_sleeping()) {
         return;
     }
@@ -78,11 +82,15 @@ static void display_wake_up(void) {
 
     prospector_display_blank_off();
 
-#if !IS_ENABLED(CONFIG_PROSPECTOR_USE_AMBIENT_LIGHT_SENSOR)
+#if defined(CONFIG_PROSPECTOR_BRIGHTNESS_MANUAL)
+    if (pwm_leds_dev) {
+        led_set_brightness(pwm_leds_dev, DISP_BL, prospector_get_brightness());
+    }
+#elif defined(CONFIG_PROSPECTOR_BRIGHTNESS_FIXED)
     if (pwm_leds_dev) {
         led_set_brightness(pwm_leds_dev, DISP_BL, CONFIG_PROSPECTOR_FIXED_BRIGHTNESS);
     }
-#else
+#elif defined(CONFIG_PROSPECTOR_BRIGHTNESS_AUTO)
     /* For ALS mode: force minimum visible brightness on wake (20%)
      * ALS thread will adjust to proper level shortly after */
     if (pwm_leds_dev) {
@@ -90,6 +98,10 @@ static void display_wake_up(void) {
     }
     /* Give ALS thread time to react and adjust brightness */
     k_msleep(150);
+#else
+    if (pwm_leds_dev) {
+        led_set_brightness(pwm_leds_dev, DISP_BL, CONFIG_PROSPECTOR_FIXED_BRIGHTNESS);
+    }
 #endif
 }
 
@@ -143,7 +155,7 @@ static int on_any_key_event(const zmk_event_t *eh) {
         return ZMK_EV_EVENT_BUBBLE;
     }
 
-    display_wake_up();
+    prospector_display_wake_up();
 #if IS_ENABLED(CONFIG_PROSPECTOR_DISPLAY_SLEEP_ENABLE)
     k_work_reschedule(&idle_work, K_MSEC(CONFIG_PROSPECTOR_DISPLAY_IDLE_TIMEOUT_MS));
 #endif

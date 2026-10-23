@@ -9,7 +9,12 @@
 #include <zephyr/logging/log.h>
 #include <zmk/behavior.h>
 
+#if IS_ENABLED(CONFIG_SHIELD_PROSPECTOR_ADAPTER)
 #include <brightness.h>
+#if IS_ENABLED(CONFIG_PROSPECTOR_DISPLAY_SLEEP_ENABLE)
+#include <prospector/display_power.h>
+#endif
+#endif
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -21,7 +26,14 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 static int on_brightness_inc_pressed(struct zmk_behavior_binding *binding,
                                      struct zmk_behavior_binding_event event) {
+#if IS_ENABLED(CONFIG_SHIELD_PROSPECTOR_ADAPTER)
+#if IS_ENABLED(CONFIG_PROSPECTOR_DISPLAY_SLEEP_ENABLE)
+    if (prospector_display_is_sleeping()) {
+        prospector_display_wake_up();
+    }
+#endif
     prospector_adjust_brightness(CONFIG_PROSPECTOR_BRIGHTNESS_STEP);
+#endif
     return ZMK_BEHAVIOR_OPAQUE;
 }
 
@@ -57,7 +69,14 @@ DT_INST_FOREACH_STATUS_OKAY(BRI_INC_INST)
 
 static int on_brightness_dec_pressed(struct zmk_behavior_binding *binding,
                                      struct zmk_behavior_binding_event event) {
+#if IS_ENABLED(CONFIG_SHIELD_PROSPECTOR_ADAPTER)
+#if IS_ENABLED(CONFIG_PROSPECTOR_DISPLAY_SLEEP_ENABLE)
+    if (prospector_display_is_sleeping()) {
+        prospector_display_wake_up();
+    }
+#endif
     prospector_adjust_brightness(-CONFIG_PROSPECTOR_BRIGHTNESS_STEP);
+#endif
     return ZMK_BEHAVIOR_OPAQUE;
 }
 
