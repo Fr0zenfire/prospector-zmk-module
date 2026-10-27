@@ -22,6 +22,12 @@ config PROSPECTOR_STATUS_SCREEN_OPERATOR
     help
         Technical and information dense layout
 
+config PROSPECTOR_STATUS_SCREEN_TRACK
+    bool "Track layout"
+    help
+        GR86 Track-mode inspired cluster: WPM tachometer, telltale
+        modifiers, battery gauges and output status
+
 endchoice
 
 config PROSPECTOR_ROTATE_DISPLAY_180

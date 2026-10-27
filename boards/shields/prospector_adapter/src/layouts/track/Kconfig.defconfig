@@ -1,0 +1,13 @@
+if PROSPECTOR_STATUS_SCREEN_TRACK
+
+config ZMK_DISPLAY_STATUS_SCREEN_CUSTOM
+    select LV_USE_LABEL
+    select LV_COLOR_SCREEN_TRANSP
+
+config ZMK_WPM
+    default y
+
+config LV_Z_MEM_POOL_SIZE
+    default 20000
+
+endif
