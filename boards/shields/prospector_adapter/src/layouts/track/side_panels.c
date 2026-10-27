@@ -30,12 +30,12 @@
 
 #define LOW_BATTERY 20
 
-/* Shared row geometry (panel-local coordinates) */
-#define ROW_PITCH   33
+/* Shared row geometry (panel-local coordinates, panel top at y = 118) */
+#define ROW_PITCH   35
 #define ROW_BAR_DY  21
 #define BAR_H       10
-#define BEZEL_Y     66
-#define BOTTOM_Y    76
+#define BEZEL_Y     82
+#define BOTTOM_Y    92
 
 /* ========================================================================== */
 /*  Left panel: battery gauges + odometer                                      */

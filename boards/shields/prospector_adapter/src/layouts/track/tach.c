@@ -319,7 +319,7 @@ int zmk_widget_track_tach_init(struct zmk_widget_track_tach *widget, lv_obj_t *p
     lv_obj_set_size(widget->obj, TACH_W, TACH_H);
     lv_obj_add_event_cb(widget->obj, tach_draw_cb, LV_EVENT_DRAW_MAIN, widget);
 
-    /* x10 WPM scale, compressed low end like the GR86's "0 2 4" */
+    /* x10 WPM scale numerals, compressed low end like the GR86's "0 2 4" */
     add_scale_numeral(widget->obj, 0, "0");
     add_scale_numeral(widget->obj, 20, "2");
     add_scale_numeral(widget->obj, 40, "4");
@@ -327,9 +327,6 @@ int zmk_widget_track_tach_init(struct zmk_widget_track_tach *widget, lv_obj_t *p
     add_scale_numeral(widget->obj, 80, "8");
     add_scale_numeral(widget->obj, 100, "10");
     add_scale_numeral(widget->obj, 120, "12");
-
-    trk_label(widget->obj, &DINishCondensed_SemiBold_20, TRK_COLOR_TEXT, BAR_X0 - 2,
-              BAR_BOTTOM + 6, 0, LV_TEXT_ALIGN_LEFT, "x10 WPM");
 
     sys_slist_append(&widgets, &widget->node);
 
