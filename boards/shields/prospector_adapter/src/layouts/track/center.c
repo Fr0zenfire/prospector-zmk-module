@@ -67,16 +67,18 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_track_center_layer, struct layer_state, layer
                             layer_get_state)
 ZMK_SUBSCRIPTION(widget_track_center_layer, zmk_layer_state_changed);
 
-/* Precomputed smooth curve points connecting left line (0,86) to right line (140,86) */
+/* Precomputed true circular arc points connecting left line (0,86) to right line (140,86) */
+/* R = 132.5 px, depth = 20 px, cradling smoothly under the TRACK pill */
 static const struct {
-    int8_t x;
-    int8_t y;
+    int16_t x;
+    int16_t y;
 } curve_pts[] = {
-    {0, 86},   {7, 86},   {14, 87},  {21, 88},  {28, 89},
-    {35, 90},  {42, 91},  {49, 92},  {56, 93},  {63, 94},
-    {70, 94},  {77, 94},  {84, 93},  {91, 92},  {98, 91},
-    {105, 90}, {112, 89}, {119, 88}, {126, 87}, {133, 86},
-    {140, 86}
+    {0, 86},   {5, 89},   {10, 92},  {15, 94},  {20, 96},
+    {25, 98},  {30, 100}, {35, 101}, {40, 103}, {45, 104},
+    {50, 104}, {55, 105}, {60, 106}, {65, 106}, {70, 106},
+    {75, 106}, {80, 106}, {85, 105}, {90, 104}, {95, 104},
+    {100, 103},{105, 101},{110, 100},{115, 98}, {120, 96},
+    {125, 94}, {130, 92}, {135, 89}, {140, 86}
 };
 
 static void center_draw_cb(lv_event_t *e) {
