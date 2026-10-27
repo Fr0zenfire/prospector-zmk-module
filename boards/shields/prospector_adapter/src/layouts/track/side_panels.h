@@ -4,7 +4,7 @@
 #include <zephyr/kernel.h>
 #include <zmk/ble.h>
 
-#define SIDE_W 76
+#define SIDE_W 70
 #define SIDE_H 106
 
 #define TRK_MAX_PERIPHERALS 4

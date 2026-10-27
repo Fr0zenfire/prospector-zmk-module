@@ -42,7 +42,7 @@
 /* ========================================================================== */
 
 #define L_X0    4
-#define L_BAR_W 62
+#define L_BAR_W 60
 
 static sys_slist_t battery_widgets = SYS_SLIST_STATIC_INIT(&battery_widgets);
 
@@ -239,13 +239,13 @@ int zmk_widget_track_battery_init(struct zmk_widget_track_battery *widget, lv_ob
                                       LV_PART_MAIN);
     }
 
-    /* bezel line meeting the centre bowl */
+    /* bezel line meeting the curved line in the centre */
     trk_fill(widget->obj, 0, BEZEL_Y, SIDE_W, 2, TRK_COLOR_BEZEL);
 
     trk_label(widget->obj, &DINishCondensed_SemiBold_20, TRK_COLOR_TEXT_DIM, 2, BOTTOM_Y, 0,
               LV_TEXT_ALIGN_LEFT, "ODO");
     widget->odo_label = trk_label(widget->obj, &DINishCondensed_SemiBold_20, TRK_COLOR_TEXT,
-                                  24, BOTTOM_Y, SIDE_W - 26, LV_TEXT_ALIGN_RIGHT, "0");
+                                  36, BOTTOM_Y, 0, LV_TEXT_ALIGN_LEFT, "0");
 
     sys_slist_append(&battery_widgets, &widget->node);
 
@@ -265,11 +265,11 @@ lv_obj_t *zmk_widget_track_battery_obj(struct zmk_widget_track_battery *widget) 
 }
 
 /* ========================================================================== */
-/*  Right panel: output + peak + link lamp                                     */
+/*  Right panel: output + link lamp                                            */
 /* ========================================================================== */
 
-#define R_X0    10
-#define R_BAR_W 62
+#define R_X0    6
+#define R_BAR_W 60
 #define CELL_GAP 2
 
 static sys_slist_t output_widgets = SYS_SLIST_STATIC_INIT(&output_widgets);

@@ -67,9 +67,48 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_track_center_layer, struct layer_state, layer
                             layer_get_state)
 ZMK_SUBSCRIPTION(widget_track_center_layer, zmk_layer_state_changed);
 
+/* Precomputed smooth curve points connecting left line (0,86) to right line (140,86) */
+static const struct {
+    int8_t x;
+    int8_t y;
+} curve_pts[] = {
+    {0, 86},   {7, 86},   {14, 87},  {21, 88},  {28, 89},
+    {35, 90},  {42, 91},  {49, 92},  {56, 93},  {63, 94},
+    {70, 94},  {77, 94},  {84, 93},  {91, 92},  {98, 91},
+    {105, 90}, {112, 89}, {119, 88}, {126, 87}, {133, 86},
+    {140, 86}
+};
+
+static void center_draw_cb(lv_event_t *e) {
+    lv_obj_t *obj = lv_event_get_target(e);
+    lv_layer_t *layer = lv_event_get_layer(e);
+
+    lv_area_t coords;
+    lv_obj_get_coords(obj, &coords);
+    const int ox = coords.x1;
+    const int oy = coords.y1;
+
+    lv_draw_line_dsc_t line;
+    lv_draw_line_dsc_init(&line);
+    line.color = lv_color_hex(TRK_COLOR_BEZEL);
+    line.width = 2;
+    line.round_start = 1;
+    line.round_end = 1;
+    line.opa = LV_OPA_COVER;
+
+    for (size_t i = 0; i < sizeof(curve_pts) / sizeof(curve_pts[0]) - 1; i++) {
+        line.p1.x = ox + curve_pts[i].x;
+        line.p1.y = oy + curve_pts[i].y;
+        line.p2.x = ox + curve_pts[i + 1].x;
+        line.p2.y = oy + curve_pts[i + 1].y;
+        lv_draw_line(layer, &line);
+    }
+}
+
 int zmk_widget_track_center_init(struct zmk_widget_track_center *widget, lv_obj_t *parent) {
     widget->obj = trk_box(parent);
     lv_obj_set_size(widget->obj, CENTER_W, CENTER_H);
+    lv_obj_add_event_cb(widget->obj, center_draw_cb, LV_EVENT_DRAW_MAIN, widget);
 
     /* Big readout, centred in the left 112px so the unit sits to its right */
     widget->wpm_label = trk_label(widget->obj, &FR_Regular_48, TRK_COLOR_TEXT, 0, 10, 112,
