@@ -30,12 +30,15 @@
 
 #define LOW_BATTERY 20
 
-/* Shared row geometry (panel-local coordinates, panel top at y = 118) */
-#define ROW_PITCH   35
+/* Shared row geometry (panel-local coordinates, panel top at screen y = 114) */
+#define ROW_PITCH   34
 #define ROW_BAR_DY  21
 #define BAR_H       10
-#define BEZEL_Y     82
-#define BOTTOM_Y    92
+#define BEZEL_Y     86
+#define BOTTOM_Y    96
+
+#define BATT_ROW_Y0 11
+#define OUT_ROW_Y   27
 
 /* ========================================================================== */
 /*  Left panel: battery gauges + odometer                                      */
@@ -213,7 +216,7 @@ int zmk_widget_track_battery_init(struct zmk_widget_track_battery *widget, lv_ob
     }
 
     for (int i = 0; i < PERIPHERAL_COUNT && i < 2; i++) {
-        int y = i * ROW_PITCH;
+        int y = BATT_ROW_Y0 + i * ROW_PITCH;
         char name[4];
         if (PERIPHERAL_COUNT == 2) {
             snprintf(name, sizeof(name), "%s", i == 0 ? "L" : "R");
@@ -345,9 +348,9 @@ int zmk_widget_track_output_init(struct zmk_widget_track_output *widget, lv_obj_
 
     /* Row 1: transport + profile (like "OUT TEMP ... PM 2:23") */
     widget->transport_label = trk_label(widget->obj, &DINishCondensed_SemiBold_20,
-                                        TRK_COLOR_TEXT, R_X0, 0, 0, LV_TEXT_ALIGN_LEFT, "BLE");
+                                        TRK_COLOR_TEXT, R_X0, OUT_ROW_Y, 0, LV_TEXT_ALIGN_LEFT, "BLE");
     widget->profile_label = trk_label(widget->obj, &DINishCondensed_SemiBold_20,
-                                      TRK_COLOR_TEXT, R_X0 + 30, 0, R_BAR_W - 30,
+                                      TRK_COLOR_TEXT, R_X0 + 30, OUT_ROW_Y, R_BAR_W - 30,
                                       LV_TEXT_ALIGN_RIGHT, "P1");
 
     /* Fuel-gauge style profile cells */
@@ -357,10 +360,10 @@ int zmk_widget_track_output_init(struct zmk_widget_track_output *widget, lv_obj_
     int used = cell_w * ZMK_BLE_PROFILE_COUNT + CELL_GAP * (ZMK_BLE_PROFILE_COUNT - 1);
     int cx = R_X0 + 2 + (inner - used) / 2;
     for (int i = 0; i < ZMK_BLE_PROFILE_COUNT; i++) {
-        widget->cells[i] = trk_fill(widget->obj, cx + i * (cell_w + CELL_GAP), ROW_BAR_DY,
+        widget->cells[i] = trk_fill(widget->obj, cx + i * (cell_w + CELL_GAP), OUT_ROW_Y + ROW_BAR_DY,
                                     cell_w, BAR_H - 2, TRK_COLOR_GAUGE_EMPTY);
     }
-    trk_gauge_frame(widget->obj, R_X0, ROW_BAR_DY - 2, R_BAR_W, BAR_H + 2);
+    trk_gauge_frame(widget->obj, R_X0, OUT_ROW_Y + ROW_BAR_DY - 2, R_BAR_W, BAR_H + 2);
 
     /* bezel line meeting the centre cluster */
     trk_fill(widget->obj, 0, BEZEL_Y, SIDE_W, 2, TRK_COLOR_BEZEL);

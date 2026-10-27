@@ -5,7 +5,7 @@
 #include <zmk/ble.h>
 
 #define SIDE_W 70
-#define SIDE_H 122
+#define SIDE_H 126
 
 #define TRK_MAX_PERIPHERALS 4
 
