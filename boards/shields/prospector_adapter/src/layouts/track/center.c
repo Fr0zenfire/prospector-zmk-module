@@ -2,7 +2,7 @@
  * Centre "bowl" of the GR86 Track cluster:
  *   - big digital readout (speed -> live WPM) with a small unit label
  *   - red-orange TRACK pill -> current layer name
- *   - grey U-shaped bezel
+ *   - circular arc connecting bezel line
  */
 
 #include "center.h"
@@ -29,7 +29,9 @@ void track_center_set_wpm(int wpm) {
 
     struct zmk_widget_track_center *widget;
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
-        lv_label_set_text(widget->wpm_label, text);
+        if (widget->wpm_label) {
+            lv_label_set_text(widget->wpm_label, text);
+        }
     }
 }
 
@@ -55,7 +57,9 @@ static void layer_update_cb(struct layer_state state) {
 
     struct zmk_widget_track_center *widget;
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
-        lv_label_set_text(widget->layer_label, text);
+        if (widget->layer_label) {
+            lv_label_set_text(widget->layer_label, text);
+        }
     }
 }
 
@@ -67,8 +71,6 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_track_center_layer, struct layer_state, layer
                             layer_get_state)
 ZMK_SUBSCRIPTION(widget_track_center_layer, zmk_layer_state_changed);
 
-/* Precomputed true circular arc points connecting left line (0,86) to right line (140,86) */
-/* R = 132.5 px, depth = 20 px, cradling smoothly under the TRACK pill */
 static const struct {
     int16_t x;
     int16_t y;
@@ -81,38 +83,24 @@ static const struct {
     {125, 94}, {130, 92}, {135, 89}, {140, 86}
 };
 
-static void center_draw_cb(lv_event_t *e) {
-    lv_obj_t *obj = lv_event_get_target(e);
-    lv_layer_t *layer = lv_event_get_layer(e);
-
-    lv_area_t coords;
-    lv_obj_get_coords(obj, &coords);
-    const int ox = coords.x1;
-    const int oy = coords.y1;
-
-    lv_draw_line_dsc_t line;
-    lv_draw_line_dsc_init(&line);
-    line.color = lv_color_hex(TRK_COLOR_BEZEL);
-    line.width = 2;
-    line.round_start = 1;
-    line.round_end = 1;
-    line.opa = LV_OPA_COVER;
-
-    for (size_t i = 0; i < sizeof(curve_pts) / sizeof(curve_pts[0]) - 1; i++) {
-        line.p1.x = ox + curve_pts[i].x;
-        line.p1.y = oy + curve_pts[i].y;
-        line.p2.x = ox + curve_pts[i + 1].x;
-        line.p2.y = oy + curve_pts[i + 1].y;
-        lv_draw_line(layer, &line);
-    }
-}
-
 int zmk_widget_track_center_init(struct zmk_widget_track_center *widget, lv_obj_t *parent) {
     widget->obj = trk_box(parent);
     lv_obj_set_size(widget->obj, CENTER_W, CENTER_H);
-    lv_obj_add_event_cb(widget->obj, center_draw_cb, LV_EVENT_DRAW_MAIN, widget);
 
-    /* Big readout, centred in the left 112px so the unit sits to its right */
+    /* Construct the circular arc bezel line out of small solid segments */
+    size_t count = sizeof(curve_pts) / sizeof(curve_pts[0]);
+    for (size_t i = 0; i < count - 1; i++) {
+        int x = curve_pts[i].x;
+        int y = curve_pts[i].y;
+        int nx = curve_pts[i + 1].x;
+        int ny = curve_pts[i + 1].y;
+        int w = nx - x;
+        int h = (ny >= y) ? (ny - y + 2) : (y - ny + 2);
+        int sy = (ny >= y) ? y : ny;
+        trk_fill(widget->obj, x, sy, w + 1, h, TRK_COLOR_BEZEL);
+    }
+
+    /* Big readout, centred in the left 112px */
     widget->wpm_label = trk_label(widget->obj, &FR_Regular_48, TRK_COLOR_TEXT, 0, 10, 112,
                                   LV_TEXT_ALIGN_CENTER, "0");
 
@@ -134,8 +122,8 @@ int zmk_widget_track_center_init(struct zmk_widget_track_center *widget, lv_obj_
                                     TRK_COLOR_PILL_TEXT, 0, 1, PILL_W, LV_TEXT_ALIGN_CENTER,
                                     "");
 
-    sys_slist_append(&widgets, &widget->node);
     widget_track_center_layer_init();
+    sys_slist_append(&widgets, &widget->node);
 
     return 0;
 }

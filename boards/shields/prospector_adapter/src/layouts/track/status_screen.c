@@ -2,22 +2,12 @@
  * "Track" status screen — inspired by the Toyota GR86 / Subaru BRZ digital
  * cluster in Track mode.
  *
- *   +--------------------------------------------------------------+
- *   |   WIN        ALT        CTRL        SHFT     <- telltales    |
- *   |                                         8  10 12             |
- *   |  0 2 4   6                    ____----||||||||  <- WPM tach  |
- *   |  ||||||||||||||||||||||||||||||||||||||||||||                |
- *   |  x10 WPM  ____________________________________               |
- *   |  L   87% |            |  BLE        P1                       |
- *   |  [=====] |     72 WPM |  [ ][#][ ][ ][ ]                     |
- *   |  R   92% |            |  PEAK      112                       |
- *   |  [=====] |            |  [------|---]                        |
- *   |  ------- \  [ BASE ] /   -------                             |
- *   |  ODO 2138 \________/   (BT) LINK                             |
- *   +--------------------------------------------------------------+
- *
- * Child order matters: display_idle.c animates screen children 0..4 as
- * top / left / right / bottom / bottom for the sleep & wake transitions.
+ * Child order matches display_idle.c:
+ *   0: telltales (top)
+ *   1: tachometer (upper-mid)
+ *   2: center cluster (lower-mid)
+ *   3: left panel (bottom-left)
+ *   4: right panel (bottom-right)
  */
 
 #include <lvgl.h>
@@ -145,9 +135,9 @@ lv_obj_t *zmk_display_status_screen() {
 
     start_boot_slide(top_obj, 0, -40, 0);
     start_boot_slide(tach_obj, -140, 0, 32);
-    start_boot_slide(center_obj, 0, 120, 64);
-    start_boot_slide(bat_obj, -90, 0, 96);
-    start_boot_slide(out_obj, 90, 0, 128);
+    start_boot_slide(center_obj, 140, 0, 64);
+    start_boot_slide(bat_obj, 0, 75, 96);
+    start_boot_slide(out_obj, 0, 75, 128);
 
     return screen;
 }

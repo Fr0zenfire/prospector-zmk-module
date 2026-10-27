@@ -1,16 +1,11 @@
 /*
  * GR86 Track-mode style tachometer, driven by WPM.
  *
- * - 38 vertical segments whose height ramps up left -> right (wedge shape).
- * - Non-linear scale like the car: 0-40 WPM is compressed into the first
- *   few segments, 40-130 WPM spreads across the rest.
+ * - 38 vertical segment objects whose height ramps up left -> right (wedge shape).
+ * - Non-linear scale like the car: 0-40 WPM compressed into first few segments,
+ *   40-130 WPM spreads across the rest.
  * - Amber zone from 100 WPM, red line from 110 WPM.
- * - Scale numerals are x10 WPM ("x10 WPM" caption, like "x1000RPM").
- * - Peak-hold segment that decays after a few seconds.
- *
- * Everything except the numerals is drawn in a single LV_EVENT_DRAW_MAIN
- * callback, and only the segments that change are invalidated, keeping SPI
- * traffic small enough for smooth 60 FPS animation.
+ * - Smooth animation via Zephyr delayable workqueue (safe from LVGL draw task issues).
  */
 
 #include "tach.h"
@@ -24,7 +19,7 @@
 #include "display_colors.h"
 #include "track_common.h"
 
-#define BAR_COUNT   38
+#define BAR_COUNT   TRK_BAR_COUNT
 #define BAR_W       5
 #define BAR_GAP     2
 #define BAR_PITCH   (BAR_W + BAR_GAP)
@@ -35,23 +30,21 @@
 #define BAR_H_MAX   52
 #define RAMP_GAP    4
 
-#define LOW_BARS    6   /* segments used by the compressed 0..LOW_WPM range */
+#define LOW_BARS    6   /* segments used by compressed 0..LOW_WPM */
 #define LOW_WPM     40
-
-#define FRAME_MS    16
 
 enum zone { ZONE_NORMAL = 0, ZONE_AMBER, ZONE_RED };
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
+static struct k_work_delayable wpm_work;
 
 static uint8_t bar_zone[BAR_COUNT];
 static int amber_first = BAR_COUNT;
 static int red_first = BAR_COUNT;
 
-static lv_timer_t *tach_timer;
-static float displayed_wpm;
-static float target_wpm;
-static int active_bars = 1;
+static float displayed_wpm = 0.0f;
+static float target_wpm = 0.0f;
+static int active_bars = 0;
 static int peak_bars = 0;
 static int peak_hold = 0;
 static int peak_decay = 0;
@@ -59,8 +52,6 @@ static int last_readout = -1;
 
 static const float smoothing_up = 0.18f;
 static const float smoothing_down = 0.04f;
-
-/* ---- geometry helpers ---------------------------------------------------- */
 
 static inline int bar_x(int i) { return BAR_X0 + i * BAR_PITCH; }
 
@@ -88,7 +79,6 @@ static float bar_start_wpm(int i) {
                          (BAR_COUNT - LOW_BARS);
 }
 
-/* y of the sloped "ramp" line above the segments, at local x */
 static int ramp_y(int x) {
     int x0 = bar_x(0);
     int x1 = bar_x(BAR_COUNT - 1) + BAR_W;
@@ -110,133 +100,54 @@ static uint32_t zone_color(int zone, bool on) {
     }
 }
 
-/* ---- drawing ------------------------------------------------------------- */
+static void tach_render(int new_active, int new_peak) {
+    struct zmk_widget_track_tach *w;
+    SYS_SLIST_FOR_EACH_CONTAINER(&widgets, w, node) {
+        if (new_active != active_bars) {
+            int lo = (new_active < active_bars) ? new_active : active_bars;
+            int hi = (new_active > active_bars) ? new_active : active_bars;
+            for (int i = lo; i < hi; i++) {
+                bool on = (i < new_active);
+                lv_obj_set_style_bg_color(w->bars[i], lv_color_hex(zone_color(bar_zone[i], on)),
+                                          LV_PART_MAIN);
+            }
+        }
 
-static void draw_hline(lv_layer_t *layer, lv_draw_line_dsc_t *dsc, int ox, int oy,
-                       int x1, int y1, int x2, int y2, uint32_t color) {
-    if (x2 <= x1) {
-        return;
-    }
-    dsc->color = lv_color_hex(color);
-    dsc->p1.x = ox + x1;
-    dsc->p1.y = oy + y1;
-    dsc->p2.x = ox + x2;
-    dsc->p2.y = oy + y2;
-    lv_draw_line(layer, dsc);
-}
-
-static void tach_draw_cb(lv_event_t *e) {
-    lv_obj_t *obj = lv_event_get_target(e);
-    lv_layer_t *layer = lv_event_get_layer(e);
-
-    lv_area_t coords;
-    lv_obj_get_coords(obj, &coords);
-    const int ox = coords.x1;
-    const int oy = coords.y1;
-
-    /* Segments */
-    lv_draw_rect_dsc_t rect;
-    lv_draw_rect_dsc_init(&rect);
-    rect.bg_opa = LV_OPA_COVER;
-    rect.radius = 0;
-    rect.border_width = 0;
-
-    int peak_slot = (peak_bars > active_bars) ? peak_bars - 1 : -1;
-
-    for (int i = 0; i < BAR_COUNT; i++) {
-        bool on = i < active_bars;
-        rect.bg_color = lv_color_hex(zone_color(bar_zone[i], on));
-        rect.bg_opa = LV_OPA_COVER;
-
-        lv_area_t a = {
-            .x1 = ox + bar_x(i),
-            .y1 = oy + BAR_BOTTOM - bar_h(i),
-            .x2 = ox + bar_x(i) + BAR_W - 1,
-            .y2 = oy + BAR_BOTTOM - 1,
-        };
-        lv_draw_rect(layer, &rect, &a);
-
-        if (i == peak_slot) {
-            rect.bg_color = lv_color_hex(zone_color(bar_zone[i], true));
-            rect.bg_opa = LV_OPA_60;
-            lv_draw_rect(layer, &rect, &a);
+        if (new_peak > new_active && new_peak > 0) {
+            int slot = new_peak - 1;
+            if (slot >= BAR_COUNT) slot = BAR_COUNT - 1;
+            lv_obj_set_pos(w->peak_bar, bar_x(slot), BAR_BOTTOM - bar_h(slot));
+            lv_obj_set_size(w->peak_bar, BAR_W, bar_h(slot));
+            lv_obj_set_style_bg_color(w->peak_bar, lv_color_hex(zone_color(bar_zone[slot], true)),
+                                      LV_PART_MAIN);
+            lv_obj_clear_flag(w->peak_bar, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(w->peak_bar, LV_OBJ_FLAG_HIDDEN);
         }
     }
-
-    /* Sloped ramp line + baseline, white -> amber -> red */
-    lv_draw_line_dsc_t line;
-    lv_draw_line_dsc_init(&line);
-    line.width = 2;
-    line.round_start = 0;
-    line.round_end = 0;
-    line.opa = LV_OPA_COVER;
-
-    int x_start = bar_x(0);
-    int x_amber = bar_x(amber_first) - 1;
-    int x_red = bar_x(red_first) - 1;
-    int x_end = bar_x(BAR_COUNT - 1) + BAR_W;
-    if (x_amber > x_end) x_amber = x_end;
-    if (x_red > x_end) x_red = x_end;
-
-    draw_hline(layer, &line, ox, oy, x_start, ramp_y(x_start), x_amber, ramp_y(x_amber),
-               TRK_COLOR_RAMP);
-    draw_hline(layer, &line, ox, oy, x_amber, ramp_y(x_amber), x_red, ramp_y(x_red),
-               TRK_COLOR_AMBER_ON);
-    draw_hline(layer, &line, ox, oy, x_red, ramp_y(x_red), x_end, ramp_y(x_end),
-               TRK_COLOR_RED_ON);
-
-    int base_y = BAR_BOTTOM + 2;
-    draw_hline(layer, &line, ox, oy, x_start, base_y, x_amber, base_y, TRK_COLOR_RAMP);
-    draw_hline(layer, &line, ox, oy, x_amber, base_y, x_red, base_y, TRK_COLOR_AMBER_ON);
-    draw_hline(layer, &line, ox, oy, x_red, base_y, x_end, base_y, TRK_COLOR_RED_ON);
 }
 
-/* Invalidate only the segment columns in [lo, hi) */
-static void invalidate_bars(lv_obj_t *obj, int lo, int hi) {
-    if (lo < 0) lo = 0;
-    if (hi > BAR_COUNT) hi = BAR_COUNT;
-    if (hi <= lo) {
-        return;
-    }
-
-    lv_area_t coords;
-    lv_obj_get_coords(obj, &coords);
-
-    lv_area_t a = {
-        .x1 = coords.x1 + bar_x(lo),
-        .y1 = coords.y1 + BAR_BOTTOM - bar_h(hi - 1),
-        .x2 = coords.x1 + bar_x(hi - 1) + BAR_W - 1,
-        .y2 = coords.y1 + BAR_BOTTOM - 1,
-    };
-    lv_obj_invalidate_area(obj, &a);
-}
-
-/* ---- animation ----------------------------------------------------------- */
-
-static void tach_timer_cb(lv_timer_t *timer) {
+static void wpm_work_handler(struct k_work *work) {
+    ARG_UNUSED(work);
     float diff = target_wpm - displayed_wpm;
     bool at_target = (diff > -0.3f && diff < 0.3f);
 
     if (at_target) {
         displayed_wpm = target_wpm;
     } else {
-        displayed_wpm += diff * ((diff > 0) ? smoothing_up : smoothing_down);
+        float factor = (diff > 0.0f) ? smoothing_up : smoothing_down;
+        displayed_wpm += diff * factor;
     }
 
-    float pos = wpm_to_pos(displayed_wpm);
-    int new_active = (int)(pos + 0.999f);
-    if (new_active < 1) new_active = 1; /* idle segment, like the car at idle */
+    int new_active = (int)(wpm_to_pos(displayed_wpm) + 0.5f);
     if (new_active > BAR_COUNT) new_active = BAR_COUNT;
-
-    int old_active = active_bars;
-    int old_peak = peak_bars;
 
     if (new_active > peak_bars) {
         peak_bars = new_active;
         peak_hold = 0;
         peak_decay = 0;
     } else if (peak_bars > new_active) {
-        if (peak_hold < 180) { /* ~3 s hold */
+        if (peak_hold < 180) {
             peak_hold++;
         } else if (++peak_decay >= 24) {
             peak_bars--;
@@ -244,19 +155,8 @@ static void tach_timer_cb(lv_timer_t *timer) {
         }
     }
 
+    tach_render(new_active, peak_bars);
     active_bars = new_active;
-
-    struct zmk_widget_track_tach *widget;
-    SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
-        if (old_active != active_bars) {
-            int lo = MIN(old_active, active_bars);
-            int hi = MAX(old_active, active_bars);
-            invalidate_bars(widget->obj, lo, hi);
-        }
-        if (old_peak != peak_bars) {
-            invalidate_bars(widget->obj, MIN(old_peak, peak_bars) - 1, MAX(old_peak, peak_bars));
-        }
-    }
 
     int readout = (int)(displayed_wpm + 0.5f);
     if (readout != last_readout) {
@@ -264,12 +164,10 @@ static void tach_timer_cb(lv_timer_t *timer) {
         track_center_set_wpm(readout);
     }
 
-    if (at_target && peak_bars <= active_bars) {
-        lv_timer_pause(timer);
+    if (!at_target || peak_bars > active_bars) {
+        k_work_schedule(&wpm_work, K_MSEC(16));
     }
 }
-
-/* ---- ZMK event plumbing -------------------------------------------------- */
 
 struct tach_state {
     uint8_t wpm;
@@ -277,10 +175,7 @@ struct tach_state {
 
 static void tach_update_cb(struct tach_state state) {
     target_wpm = (float)state.wpm;
-
-    if (tach_timer) {
-        lv_timer_resume(tach_timer);
-    }
+    k_work_schedule(&wpm_work, K_NO_WAIT);
 }
 
 static struct tach_state tach_get_state(const zmk_event_t *eh) {
@@ -289,8 +184,6 @@ static struct tach_state tach_get_state(const zmk_event_t *eh) {
 
 ZMK_DISPLAY_WIDGET_LISTENER(widget_track_tach, struct tach_state, tach_update_cb, tach_get_state)
 ZMK_SUBSCRIPTION(widget_track_tach, zmk_wpm_state_changed);
-
-/* ---- init ---------------------------------------------------------------- */
 
 static void add_scale_numeral(lv_obj_t *parent, int wpm, const char *text) {
     int cx = bar_x(0) + (int)(wpm_to_pos((float)wpm) * BAR_PITCH);
@@ -317,9 +210,46 @@ int zmk_widget_track_tach_init(struct zmk_widget_track_tach *widget, lv_obj_t *p
 
     widget->obj = trk_box(parent);
     lv_obj_set_size(widget->obj, TACH_W, TACH_H);
-    lv_obj_add_event_cb(widget->obj, tach_draw_cb, LV_EVENT_DRAW_MAIN, widget);
 
-    /* x10 WPM scale numerals, compressed low end like the GR86's "0 2 4" */
+    /* 38 Segment bar objects */
+    for (int i = 0; i < BAR_COUNT; i++) {
+        widget->bars[i] = trk_fill(widget->obj, bar_x(i), BAR_BOTTOM - bar_h(i), BAR_W, bar_h(i),
+                                   zone_color(bar_zone[i], false));
+    }
+
+    /* Peak bar overlay */
+    widget->peak_bar = trk_fill(widget->obj, bar_x(0), BAR_BOTTOM - bar_h(0), BAR_W, bar_h(0),
+                                TRK_COLOR_BAR_ON);
+    lv_obj_add_flag(widget->peak_bar, LV_OBJ_FLAG_HIDDEN);
+
+    /* Sloped ramp line segments above each bar */
+    for (int i = 0; i < BAR_COUNT; i++) {
+        uint32_t rcolor = (bar_zone[i] == ZONE_RED) ? TRK_COLOR_RED_ON
+                         : (bar_zone[i] == ZONE_AMBER) ? TRK_COLOR_AMBER_ON
+                         : TRK_COLOR_RAMP;
+        trk_fill(widget->obj, bar_x(i), BAR_BOTTOM - bar_h(i) - RAMP_GAP, BAR_PITCH, 2, rcolor);
+    }
+
+    /* Baseline under bars: normal, amber, red */
+    int x_start = bar_x(0);
+    int x_amber = bar_x(amber_first) - 1;
+    int x_red = bar_x(red_first) - 1;
+    int x_end = bar_x(BAR_COUNT - 1) + BAR_W;
+    int base_y = BAR_BOTTOM + 2;
+    if (x_amber > x_end) x_amber = x_end;
+    if (x_red > x_end) x_red = x_end;
+
+    if (x_amber > x_start) {
+        trk_fill(widget->obj, x_start, base_y, x_amber - x_start, 2, TRK_COLOR_RAMP);
+    }
+    if (x_red > x_amber) {
+        trk_fill(widget->obj, x_amber, base_y, x_red - x_amber, 2, TRK_COLOR_AMBER_ON);
+    }
+    if (x_end > x_red) {
+        trk_fill(widget->obj, x_red, base_y, x_end - x_red, 2, TRK_COLOR_RED_ON);
+    }
+
+    /* Numerals */
     add_scale_numeral(widget->obj, 0, "0");
     add_scale_numeral(widget->obj, 20, "2");
     add_scale_numeral(widget->obj, 40, "4");
@@ -328,14 +258,10 @@ int zmk_widget_track_tach_init(struct zmk_widget_track_tach *widget, lv_obj_t *p
     add_scale_numeral(widget->obj, 100, "10");
     add_scale_numeral(widget->obj, 120, "12");
 
-    sys_slist_append(&widgets, &widget->node);
-
-    if (tach_timer == NULL) {
-        tach_timer = lv_timer_create(tach_timer_cb, FRAME_MS, NULL);
-        lv_timer_pause(tach_timer);
-    }
+    k_work_init_delayable(&wpm_work, wpm_work_handler);
 
     widget_track_tach_init();
+    sys_slist_append(&widgets, &widget->node);
 
     return 0;
 }

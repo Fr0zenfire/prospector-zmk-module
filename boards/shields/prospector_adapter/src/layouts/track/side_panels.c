@@ -20,7 +20,7 @@
 #include <zmk/events/battery_state_changed.h>
 #include <zmk/events/ble_active_profile_changed.h>
 #include <zmk/events/endpoint_changed.h>
-#include <zmk/events/position_state_changed.h>
+#include <zmk/events/keycode_state_changed.h>
 #include <zmk/events/split_central_status_changed.h>
 
 #include "display_colors.h"
@@ -63,7 +63,6 @@ static void render_battery(struct zmk_widget_track_battery *w, int i) {
     char text[8];
 
     if (online && !battery_known[i]) {
-        /* linked, waiting for the first battery report */
         snprintf(text, sizeof(text), "--");
         lv_obj_add_flag(w->fills[i], LV_OBJ_FLAG_HIDDEN);
         lv_obj_set_style_border_color(w->frames[i], lv_color_hex(TRK_COLOR_GAUGE_FRAME),
@@ -95,18 +94,17 @@ static void render_battery(struct zmk_widget_track_battery *w, int i) {
 }
 
 struct battery_state {
-    bool valid;
     uint8_t source;
     uint8_t level;
 };
 
 static void battery_update_cb(struct battery_state s) {
-    if (!s.valid || s.source >= PERIPHERAL_COUNT) {
+    if (s.source >= PERIPHERAL_COUNT) {
         return;
     }
     battery_level[s.source] = s.level;
     battery_known[s.source] = true;
-    battery_connected[s.source] = true; /* a report implies a live link */
+    battery_connected[s.source] = true;
 
     struct zmk_widget_track_battery *w;
     SYS_SLIST_FOR_EACH_CONTAINER(&battery_widgets, w, node) {
@@ -119,11 +117,10 @@ static struct battery_state battery_get_state(const zmk_event_t *eh) {
         const struct zmk_peripheral_battery_state_changed *ev =
             as_zmk_peripheral_battery_state_changed(eh);
         if (ev) {
-            return (struct battery_state){
-                .valid = true, .source = ev->source, .level = ev->state_of_charge};
+            return (struct battery_state){.source = ev->source, .level = ev->state_of_charge};
         }
     }
-    return (struct battery_state){.valid = false};
+    return (struct battery_state){.source = 0, .level = 0};
 }
 
 ZMK_DISPLAY_WIDGET_LISTENER(widget_track_battery, struct battery_state, battery_update_cb,
@@ -131,13 +128,12 @@ ZMK_DISPLAY_WIDGET_LISTENER(widget_track_battery, struct battery_state, battery_
 ZMK_SUBSCRIPTION(widget_track_battery, zmk_peripheral_battery_state_changed);
 
 struct link_state {
-    bool valid;
     uint8_t slot;
     bool connected;
 };
 
 static void link_update_cb(struct link_state s) {
-    if (!s.valid || s.slot >= PERIPHERAL_COUNT) {
+    if (s.slot >= PERIPHERAL_COUNT) {
         return;
     }
     battery_connected[s.slot] = s.connected;
@@ -153,17 +149,17 @@ static struct link_state link_get_state(const zmk_event_t *eh) {
         const struct zmk_split_central_status_changed *ev =
             as_zmk_split_central_status_changed(eh);
         if (ev) {
-            return (struct link_state){.valid = true, .slot = ev->slot, .connected = ev->connected};
+            return (struct link_state){.slot = ev->slot, .connected = ev->connected};
         }
     }
-    return (struct link_state){.valid = false};
+    return (struct link_state){.slot = 0, .connected = false};
 }
 
 ZMK_DISPLAY_WIDGET_LISTENER(widget_track_split_link, struct link_state, link_update_cb,
                             link_get_state)
 ZMK_SUBSCRIPTION(widget_track_split_link, zmk_split_central_status_changed);
 
-/* --- keystroke odometer --- */
+/* --- keystroke odometer (driven by keycode events received on central dongle) --- */
 
 static atomic_t keystrokes = ATOMIC_INIT(0);
 static uint32_t odo_shown = UINT32_MAX;
@@ -190,13 +186,15 @@ static void odo_update_cb(struct odo_state s) {
 
     struct zmk_widget_track_battery *w;
     SYS_SLIST_FOR_EACH_CONTAINER(&battery_widgets, w, node) {
-        lv_label_set_text(w->odo_label, text);
+        if (w->odo_label) {
+            lv_label_set_text(w->odo_label, text);
+        }
     }
 }
 
 static struct odo_state odo_get_state(const zmk_event_t *eh) {
     if (eh) {
-        const struct zmk_position_state_changed *ev = as_zmk_position_state_changed(eh);
+        const struct zmk_keycode_state_changed *ev = as_zmk_keycode_state_changed(eh);
         if (ev && ev->state) {
             atomic_inc(&keystrokes);
         }
@@ -205,7 +203,7 @@ static struct odo_state odo_get_state(const zmk_event_t *eh) {
 }
 
 ZMK_DISPLAY_WIDGET_LISTENER(widget_track_odo, struct odo_state, odo_update_cb, odo_get_state)
-ZMK_SUBSCRIPTION(widget_track_odo, zmk_position_state_changed);
+ZMK_SUBSCRIPTION(widget_track_odo, zmk_keycode_state_changed);
 
 int zmk_widget_track_battery_init(struct zmk_widget_track_battery *widget, lv_obj_t *parent) {
     widget->obj = trk_box(parent);
@@ -230,7 +228,6 @@ int zmk_widget_track_battery_init(struct zmk_widget_track_battery *widget, lv_ob
                                           TRK_COLOR_TEXT_DIM, L_X0 + 20, y, L_BAR_W - 20,
                                           LV_TEXT_ALIGN_RIGHT, "--");
 
-        /* empty track, fill, then open-top frame on top */
         trk_fill(widget->obj, L_X0 + 2, y + ROW_BAR_DY, L_BAR_W - 4, BAR_H - 2,
                  TRK_COLOR_GAUGE_EMPTY);
         widget->fills[i] = trk_fill(widget->obj, L_X0 + 2, y + ROW_BAR_DY, 1, BAR_H - 2,
@@ -250,8 +247,6 @@ int zmk_widget_track_battery_init(struct zmk_widget_track_battery *widget, lv_ob
     widget->odo_label = trk_label(widget->obj, &DINishCondensed_SemiBold_20, TRK_COLOR_TEXT,
                                   36, BOTTOM_Y, 0, LV_TEXT_ALIGN_LEFT, "0");
 
-    sys_slist_append(&battery_widgets, &widget->node);
-
     for (int i = 0; i < PERIPHERAL_COUNT; i++) {
         render_battery(widget, i);
     }
@@ -259,6 +254,8 @@ int zmk_widget_track_battery_init(struct zmk_widget_track_battery *widget, lv_ob
     widget_track_battery_init();
     widget_track_split_link_init();
     widget_track_odo_init();
+
+    sys_slist_append(&battery_widgets, &widget->node);
 
     return 0;
 }
@@ -277,76 +274,101 @@ lv_obj_t *zmk_widget_track_battery_obj(struct zmk_widget_track_battery *widget) 
 
 static sys_slist_t output_widgets = SYS_SLIST_STATIC_INIT(&output_widgets);
 
-struct output_state {
-    enum zmk_transport transport;
-    uint8_t profile;
-    bool connected;
-};
+static uint8_t active_profile_index = 0;
+static enum zmk_transport active_transport = ZMK_TRANSPORT_USB;
+static bool active_profile_connected = false;
 
-static void output_update_cb(struct output_state s) {
-    bool usb = (s.transport == ZMK_TRANSPORT_USB);
+static void update_output_widget(struct zmk_widget_track_output *w) {
+    bool usb = (active_transport == ZMK_TRANSPORT_USB);
     char profile_text[6];
-    snprintf(profile_text, sizeof(profile_text), "P%u", (unsigned int)(s.profile + 1));
+    snprintf(profile_text, sizeof(profile_text), "P%u", (unsigned int)(active_profile_index + 1));
 
-    struct zmk_widget_track_output *w;
-    SYS_SLIST_FOR_EACH_CONTAINER(&output_widgets, w, node) {
+    if (w->transport_label) {
         lv_label_set_text(w->transport_label, usb ? "USB" : "BLE");
+    }
+    if (w->profile_label) {
         lv_label_set_text(w->profile_label, profile_text);
+    }
 
-        for (int i = 0; i < ZMK_BLE_PROFILE_COUNT; i++) {
-            uint32_t color = TRK_COLOR_GAUGE_EMPTY;
-            if (i == s.profile) {
-                if (usb) {
-                    color = TRK_COLOR_TEXT_DIM;
-                } else {
-                    color = s.connected ? TRK_COLOR_GAUGE_FILL : TRK_COLOR_LINK_WARN;
-                }
+    for (int i = 0; i < ZMK_BLE_PROFILE_COUNT; i++) {
+        if (!w->cells[i]) continue;
+        uint32_t color = TRK_COLOR_GAUGE_EMPTY;
+        if (i == active_profile_index) {
+            if (usb) {
+                color = TRK_COLOR_TEXT_DIM;
+            } else {
+                color = active_profile_connected ? TRK_COLOR_GAUGE_FILL : TRK_COLOR_LINK_WARN;
             }
-            lv_obj_set_style_bg_color(w->cells[i], lv_color_hex(color), LV_PART_MAIN);
         }
+        lv_obj_set_style_bg_color(w->cells[i], lv_color_hex(color), LV_PART_MAIN);
+    }
 
-        uint32_t lamp;
-        const char *icon;
-        const char *text;
-        if (usb) {
-            lamp = TRK_COLOR_LINK_USB;
-            icon = LV_SYMBOL_USB;
-            text = "USB";
-        } else if (s.connected) {
-            lamp = TRK_COLOR_LINK_OK;
-            icon = LV_SYMBOL_BLUETOOTH;
-            text = "LINK";
-        } else {
-            lamp = TRK_COLOR_LINK_WARN;
-            icon = LV_SYMBOL_BLUETOOTH;
-            text = "OFF";
-        }
+    uint32_t lamp;
+    const char *icon;
+    const char *text;
+    if (usb) {
+        lamp = TRK_COLOR_LINK_USB;
+        icon = LV_SYMBOL_USB;
+        text = "USB";
+    } else if (active_profile_connected) {
+        lamp = TRK_COLOR_LINK_OK;
+        icon = LV_SYMBOL_BLUETOOTH;
+        text = "LINK";
+    } else {
+        lamp = TRK_COLOR_LINK_WARN;
+        icon = LV_SYMBOL_BLUETOOTH;
+        text = "OFF";
+    }
+
+    if (w->link_icon) {
         lv_label_set_text(w->link_icon, icon);
         lv_obj_set_style_text_color(w->link_icon, lv_color_hex(lamp), LV_PART_MAIN);
+    }
+    if (w->link_label) {
         lv_label_set_text(w->link_label, text);
         lv_obj_set_style_text_color(w->link_label, lv_color_hex(lamp), LV_PART_MAIN);
     }
 }
 
-static struct output_state output_get_state(const zmk_event_t *eh) {
-    struct zmk_endpoint_instance selected = zmk_endpoint_get_selected();
-    return (struct output_state){
-        .transport = selected.transport,
-        .profile = zmk_ble_active_profile_index(),
-        .connected = zmk_ble_active_profile_is_connected(),
-    };
+static int endpoint_changed_listener(const zmk_event_t *eh) {
+    const struct zmk_endpoint_changed *event = as_zmk_endpoint_changed(eh);
+    if (event) {
+        struct zmk_endpoint_instance selected = zmk_endpoint_get_selected();
+        active_transport = selected.transport;
+
+        struct zmk_widget_track_output *w;
+        SYS_SLIST_FOR_EACH_CONTAINER(&output_widgets, w, node) {
+            update_output_widget(w);
+        }
+    }
+    return ZMK_EV_EVENT_BUBBLE;
 }
 
-ZMK_DISPLAY_WIDGET_LISTENER(widget_track_output, struct output_state, output_update_cb,
-                            output_get_state)
-ZMK_SUBSCRIPTION(widget_track_output, zmk_endpoint_changed);
-ZMK_SUBSCRIPTION(widget_track_output, zmk_ble_active_profile_changed);
+static int ble_active_profile_changed_listener(const zmk_event_t *eh) {
+    const struct zmk_ble_active_profile_changed *event = as_zmk_ble_active_profile_changed(eh);
+    if (event) {
+        active_profile_index = event->index;
+        active_profile_connected = zmk_ble_active_profile_is_connected();
+
+        struct zmk_widget_track_output *w;
+        SYS_SLIST_FOR_EACH_CONTAINER(&output_widgets, w, node) {
+            update_output_widget(w);
+        }
+    }
+    return ZMK_EV_EVENT_BUBBLE;
+}
+
+ZMK_LISTENER(widget_track_output_endpoint, endpoint_changed_listener);
+ZMK_SUBSCRIPTION(widget_track_output_endpoint, zmk_endpoint_changed);
+
+ZMK_LISTENER(widget_track_output_profile, ble_active_profile_changed_listener);
+ZMK_SUBSCRIPTION(widget_track_output_profile, zmk_ble_active_profile_changed);
 
 int zmk_widget_track_output_init(struct zmk_widget_track_output *widget, lv_obj_t *parent) {
     widget->obj = trk_box(parent);
     lv_obj_set_size(widget->obj, SIDE_W, SIDE_H);
 
-    /* Row 1: transport + profile (like "OUT TEMP ... PM 2:23") */
+    /* Row 1: transport + profile */
     widget->transport_label = trk_label(widget->obj, &DINishCondensed_SemiBold_20,
                                         TRK_COLOR_TEXT, R_X0, OUT_ROW_Y, 0, LV_TEXT_ALIGN_LEFT, "BLE");
     widget->profile_label = trk_label(widget->obj, &DINishCondensed_SemiBold_20,
@@ -368,7 +390,7 @@ int zmk_widget_track_output_init(struct zmk_widget_track_output *widget, lv_obj_
     /* bezel line meeting the centre cluster */
     trk_fill(widget->obj, 0, BEZEL_Y, SIDE_W, 2, TRK_COLOR_BEZEL);
 
-    /* Link telltale (like the orange traction-control "OFF" lamp) */
+    /* Link telltale */
     widget->link_icon = lv_label_create(widget->obj);
     lv_obj_set_pos(widget->link_icon, R_X0, BOTTOM_Y);
     lv_label_set_text(widget->link_icon, LV_SYMBOL_BLUETOOTH);
@@ -376,8 +398,8 @@ int zmk_widget_track_output_init(struct zmk_widget_track_output *widget, lv_obj_
                                    TRK_COLOR_LINK_WARN, R_X0 + 24, BOTTOM_Y, R_BAR_W - 24,
                                    LV_TEXT_ALIGN_RIGHT, "OFF");
 
+    update_output_widget(widget);
     sys_slist_append(&output_widgets, &widget->node);
-    widget_track_output_init();
 
     return 0;
 }
