@@ -232,9 +232,9 @@ int zmk_widget_track_tach_init(struct zmk_widget_track_tach *widget, lv_obj_t *p
         lv_obj_add_flag(widget->peak_bar, LV_OBJ_FLAG_HIDDEN);
     }
 
-    /* Sloped ramp line segments (stepped across 3 bars each) */
-    for (int i = 0; i < BAR_COUNT; i += 3) {
-        int count = (i + 3 <= BAR_COUNT) ? 3 : (BAR_COUNT - i);
+    /* Sloped ramp line segments (stepped across 4 bars each) */
+    for (int i = 0; i < BAR_COUNT; i += 4) {
+        int count = (i + 4 <= BAR_COUNT) ? 4 : (BAR_COUNT - i);
         int mid = i + count / 2;
         uint32_t rcolor = (bar_zone[i] == ZONE_RED) ? TRK_COLOR_RED_ON
                          : (bar_zone[i] == ZONE_AMBER) ? TRK_COLOR_AMBER_ON
