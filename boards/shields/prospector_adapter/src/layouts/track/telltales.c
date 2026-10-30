@@ -15,6 +15,7 @@
 #endif
 
 #include <modifier_order.h>
+#include <symbols.h>
 
 #include "display_colors.h"
 #include "track_common.h"
@@ -23,6 +24,24 @@
 #define TELL_INSET  26
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
+
+static const enum modifier_type trk_mod_order[4] = {
+    MOD_TYPE_SHIFT, MOD_TYPE_CTRL, MOD_TYPE_GUI, MOD_TYPE_ALT
+};
+
+static const char *trk_mod_symbol(enum modifier_type type, bool caps_word) {
+    switch (type) {
+    case MOD_TYPE_SHIFT:
+        return caps_word ? SYMBOL_SHIFT_FILLED : SYMBOL_SHIFT;
+    case MOD_TYPE_CTRL:
+        return SYMBOL_CONTROL;
+    case MOD_TYPE_GUI:
+        return SYMBOL_COMMAND;
+    case MOD_TYPE_ALT:
+    default:
+        return SYMBOL_OPTION;
+    }
+}
 
 struct telltale_state {
     bool mods[MOD_TYPE_COUNT];
@@ -51,11 +70,16 @@ static void telltale_update_cb(struct telltale_state state) {
     struct zmk_widget_track_telltales *widget;
     SYS_SLIST_FOR_EACH_CONTAINER(&widgets, widget, node) {
         for (int i = 0; i < 4; i++) {
-            enum modifier_type type = modifier_order_get(i);
+            enum modifier_type type = trk_mod_order[i];
             uint32_t color = state.mods[type] ? lamp_color(type) : TRK_COLOR_TELL_OFF;
 
-            if (type == MOD_TYPE_SHIFT && state.caps_word) {
-                color = TRK_COLOR_TELL_CAPS_WORD;
+            if (type == MOD_TYPE_SHIFT) {
+                if (state.caps_word) {
+                    color = TRK_COLOR_TELL_CAPS_WORD;
+                }
+#ifdef CONFIG_DT_HAS_ZMK_BEHAVIOR_CAPS_WORD_ENABLED
+                lv_label_set_text(widget->labels[i], trk_mod_symbol(type, state.caps_word));
+#endif
             }
 
             lv_obj_set_style_text_color(widget->labels[i], lv_color_hex(color), LV_PART_MAIN);
@@ -102,9 +126,10 @@ int zmk_widget_track_telltales_init(struct zmk_widget_track_telltales *widget,
     int pitch = span / 4;                   /* 57px */
     for (int i = 0; i < 4; i++) {
         int cx = TELL_INSET + pitch / 2 + i * pitch;
-        widget->labels[i] = trk_label(widget->obj, &DINishCondensed_SemiBold_20,
-                                      TRK_COLOR_TELL_OFF, cx - LAMP_W / 2, 0, LAMP_W,
-                                      LV_TEXT_ALIGN_CENTER, modifier_order_get_text(i));
+        int y_pos = (trk_mod_order[i] == MOD_TYPE_CTRL) ? 5 : 0;
+        widget->labels[i] = trk_label(widget->obj, &Symbols_Bold_26,
+                                      TRK_COLOR_TELL_OFF, cx - LAMP_W / 2, y_pos, LAMP_W,
+                                      LV_TEXT_ALIGN_CENTER, trk_mod_symbol(trk_mod_order[i], false));
     }
 
     sys_slist_append(&widgets, &widget->node);

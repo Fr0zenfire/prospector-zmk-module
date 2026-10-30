@@ -112,7 +112,7 @@ lv_obj_t *zmk_display_status_screen() {
     }
 #endif
     if (top_obj) {
-        lv_obj_set_pos(top_obj, 0, 10);
+        lv_obj_set_pos(top_obj, 0, 6);
     }
 
     /* 1: WPM tachometer */

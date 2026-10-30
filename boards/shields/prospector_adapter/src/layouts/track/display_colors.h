@@ -41,6 +41,6 @@
 #define TRK_COLOR_TELL_CAPS_WORD 0xFFB300
 
 /* Link status */
-#define TRK_COLOR_LINK_OK        0x2EE66B
+#define TRK_COLOR_LINK_OK        0x4FC3F7
 #define TRK_COLOR_LINK_WARN      0xFFA000
-#define TRK_COLOR_LINK_USB       0x4FC3F7
+#define TRK_COLOR_LINK_USB       0x2EE66B

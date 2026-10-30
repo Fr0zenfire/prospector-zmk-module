@@ -4,7 +4,7 @@
 #include <zephyr/kernel.h>
 
 #define TELLTALE_W 280
-#define TELLTALE_H 24
+#define TELLTALE_H 28
 
 struct zmk_widget_track_telltales {
     sys_snode_t node;

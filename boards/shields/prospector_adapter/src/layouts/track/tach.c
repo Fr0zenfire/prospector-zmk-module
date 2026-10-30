@@ -193,7 +193,7 @@ ZMK_SUBSCRIPTION(widget_track_tach, zmk_wpm_state_changed);
 static void add_scale_numeral(lv_obj_t *parent, int wpm, const char *text) {
     int cx = bar_x(0) + (int)(wpm_to_pos((float)wpm) * BAR_PITCH);
     int line_h = lv_font_get_line_height(&DINish_Medium_24);
-    int y = ramp_y(cx) - 3 - line_h;
+    int y = ramp_y(cx) - 6 - line_h;
     trk_label(parent, &DINish_Medium_24, TRK_COLOR_TEXT, cx - 15, y, 30, LV_TEXT_ALIGN_CENTER,
               text);
 }
