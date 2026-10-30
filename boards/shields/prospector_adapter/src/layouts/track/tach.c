@@ -1,7 +1,7 @@
 /*
  * GR86 Track-mode style tachometer, driven by WPM.
  *
- * - 38 vertical segment objects whose height ramps up left -> right (wedge shape).
+ * - 26 vertical segment objects whose height ramps up left -> right (wedge shape).
  * - Non-linear scale like the car: 0-40 WPM compressed into first few segments,
  *   40-130 WPM spreads across the rest.
  * - Amber zone from 100 WPM, red line from 110 WPM.
@@ -20,7 +20,7 @@
 #include "track_common.h"
 
 #define BAR_COUNT   TRK_BAR_COUNT
-#define BAR_W       5
+#define BAR_W       8
 #define BAR_GAP     2
 #define BAR_PITCH   (BAR_W + BAR_GAP)
 #define BAR_SPAN    (BAR_COUNT * BAR_PITCH - BAR_GAP)
@@ -30,7 +30,7 @@
 #define BAR_H_MAX   52
 #define RAMP_GAP    4
 
-#define LOW_BARS    6   /* segments used by compressed 0..LOW_WPM */
+#define LOW_BARS    4   /* segments used by compressed 0..LOW_WPM */
 #define LOW_WPM     40
 
 enum zone { ZONE_NORMAL = 0, ZONE_AMBER, ZONE_RED };
@@ -107,22 +107,27 @@ static void tach_render(int new_active, int new_peak) {
             int lo = (new_active < active_bars) ? new_active : active_bars;
             int hi = (new_active > active_bars) ? new_active : active_bars;
             for (int i = lo; i < hi; i++) {
+                if (i < 0 || i >= BAR_COUNT || !w->bars[i]) {
+                    continue;
+                }
                 bool on = (i < new_active);
                 lv_obj_set_style_bg_color(w->bars[i], lv_color_hex(zone_color(bar_zone[i], on)),
                                           LV_PART_MAIN);
             }
         }
 
-        if (new_peak > new_active && new_peak > 0) {
-            int slot = new_peak - 1;
-            if (slot >= BAR_COUNT) slot = BAR_COUNT - 1;
-            lv_obj_set_pos(w->peak_bar, bar_x(slot), BAR_BOTTOM - bar_h(slot));
-            lv_obj_set_size(w->peak_bar, BAR_W, bar_h(slot));
-            lv_obj_set_style_bg_color(w->peak_bar, lv_color_hex(zone_color(bar_zone[slot], true)),
-                                      LV_PART_MAIN);
-            lv_obj_clear_flag(w->peak_bar, LV_OBJ_FLAG_HIDDEN);
-        } else {
-            lv_obj_add_flag(w->peak_bar, LV_OBJ_FLAG_HIDDEN);
+        if (w->peak_bar) {
+            if (new_peak > new_active && new_peak > 0) {
+                int slot = new_peak - 1;
+                if (slot >= BAR_COUNT) slot = BAR_COUNT - 1;
+                lv_obj_set_pos(w->peak_bar, bar_x(slot), BAR_BOTTOM - bar_h(slot));
+                lv_obj_set_size(w->peak_bar, BAR_W, bar_h(slot));
+                lv_obj_set_style_bg_color(w->peak_bar, lv_color_hex(zone_color(bar_zone[slot], true)),
+                                          LV_PART_MAIN);
+                lv_obj_clear_flag(w->peak_bar, LV_OBJ_FLAG_HIDDEN);
+            } else {
+                lv_obj_add_flag(w->peak_bar, LV_OBJ_FLAG_HIDDEN);
+            }
         }
     }
 }
@@ -194,6 +199,9 @@ static void add_scale_numeral(lv_obj_t *parent, int wpm, const char *text) {
 }
 
 int zmk_widget_track_tach_init(struct zmk_widget_track_tach *widget, lv_obj_t *parent) {
+    amber_first = BAR_COUNT;
+    red_first = BAR_COUNT;
+
     for (int i = 0; i < BAR_COUNT; i++) {
         float w = bar_start_wpm(i);
         if (w >= TRK_TACH_RED_WPM) {
@@ -211,7 +219,7 @@ int zmk_widget_track_tach_init(struct zmk_widget_track_tach *widget, lv_obj_t *p
     widget->obj = trk_box(parent);
     lv_obj_set_size(widget->obj, TACH_W, TACH_H);
 
-    /* 38 Segment bar objects */
+    /* 26 Segment bar objects */
     for (int i = 0; i < BAR_COUNT; i++) {
         widget->bars[i] = trk_fill(widget->obj, bar_x(i), BAR_BOTTOM - bar_h(i), BAR_W, bar_h(i),
                                    zone_color(bar_zone[i], false));
@@ -220,14 +228,19 @@ int zmk_widget_track_tach_init(struct zmk_widget_track_tach *widget, lv_obj_t *p
     /* Peak bar overlay */
     widget->peak_bar = trk_fill(widget->obj, bar_x(0), BAR_BOTTOM - bar_h(0), BAR_W, bar_h(0),
                                 TRK_COLOR_BAR_ON);
-    lv_obj_add_flag(widget->peak_bar, LV_OBJ_FLAG_HIDDEN);
+    if (widget->peak_bar) {
+        lv_obj_add_flag(widget->peak_bar, LV_OBJ_FLAG_HIDDEN);
+    }
 
-    /* Sloped ramp line segments above each bar */
-    for (int i = 0; i < BAR_COUNT; i++) {
+    /* Sloped ramp line segments (stepped across 3 bars each) */
+    for (int i = 0; i < BAR_COUNT; i += 3) {
+        int count = (i + 3 <= BAR_COUNT) ? 3 : (BAR_COUNT - i);
+        int mid = i + count / 2;
         uint32_t rcolor = (bar_zone[i] == ZONE_RED) ? TRK_COLOR_RED_ON
                          : (bar_zone[i] == ZONE_AMBER) ? TRK_COLOR_AMBER_ON
                          : TRK_COLOR_RAMP;
-        trk_fill(widget->obj, bar_x(i), BAR_BOTTOM - bar_h(i) - RAMP_GAP, BAR_PITCH, 2, rcolor);
+        trk_fill(widget->obj, bar_x(i), BAR_BOTTOM - bar_h(mid) - RAMP_GAP,
+                 count * BAR_PITCH - BAR_GAP, 2, rcolor);
     }
 
     /* Baseline under bars: normal, amber, red */
@@ -258,10 +271,9 @@ int zmk_widget_track_tach_init(struct zmk_widget_track_tach *widget, lv_obj_t *p
     add_scale_numeral(widget->obj, 100, "10");
     add_scale_numeral(widget->obj, 120, "12");
 
-    k_work_init_delayable(&wpm_work, wpm_work_handler);
-
-    widget_track_tach_init();
     sys_slist_append(&widgets, &widget->node);
+    k_work_init_delayable(&wpm_work, wpm_work_handler);
+    widget_track_tach_init();
 
     return 0;
 }

@@ -60,6 +60,10 @@ static void boot_anim_ty(void *obj, int32_t v) {
 }
 
 static void start_boot_slide(lv_obj_t *obj, int32_t off_x, int32_t off_y, uint32_t delay_ms) {
+    if (!obj) {
+        return;
+    }
+
     lv_obj_set_style_translate_x(obj, (lv_coord_t)off_x, LV_PART_MAIN);
     lv_obj_set_style_translate_y(obj, (lv_coord_t)off_y, LV_PART_MAIN);
 
@@ -90,6 +94,9 @@ static void start_boot_slide(lv_obj_t *obj, int32_t off_x, int32_t off_y, uint32
 
 lv_obj_t *zmk_display_status_screen() {
     lv_obj_t *screen = lv_obj_create(NULL);
+    if (!screen) {
+        return NULL;
+    }
     lv_obj_set_style_bg_color(screen, lv_color_hex(0x000000), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(screen, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_clear_flag(screen, LV_OBJ_FLAG_SCROLLABLE);
@@ -100,37 +107,51 @@ lv_obj_t *zmk_display_status_screen() {
     lv_obj_t *top_obj = zmk_widget_track_telltales_obj(&telltales_widget);
 #else
     lv_obj_t *top_obj = trk_box(screen);
-    lv_obj_set_size(top_obj, TELLTALE_W, TELLTALE_H);
+    if (top_obj) {
+        lv_obj_set_size(top_obj, TELLTALE_W, TELLTALE_H);
+    }
 #endif
-    lv_obj_set_pos(top_obj, 0, 8);
+    if (top_obj) {
+        lv_obj_set_pos(top_obj, 0, 8);
+    }
 
     /* 1: WPM tachometer */
     zmk_widget_track_tach_init(&tach_widget, screen);
     lv_obj_t *tach_obj = zmk_widget_track_tach_obj(&tach_widget);
-    lv_obj_set_pos(tach_obj, 0, 28);
+    if (tach_obj) {
+        lv_obj_set_pos(tach_obj, 0, 28);
+    }
 
     /* 2: centre bowl (WPM readout + layer pill) */
     zmk_widget_track_center_init(&center_widget, screen);
     lv_obj_t *center_obj = zmk_widget_track_center_obj(&center_widget);
-    lv_obj_set_pos(center_obj, (TRK_SCREEN_W - CENTER_W) / 2, TRK_SCREEN_H - CENTER_H);
+    if (center_obj) {
+        lv_obj_set_pos(center_obj, (TRK_SCREEN_W - CENTER_W) / 2, TRK_SCREEN_H - CENTER_H);
+    }
 
     /* 3: left panel (batteries + odometer) */
     zmk_widget_track_battery_init(&battery_widget, screen);
     lv_obj_t *bat_obj = zmk_widget_track_battery_obj(&battery_widget);
-    lv_obj_set_pos(bat_obj, 0, TRK_SCREEN_H - SIDE_H);
+    if (bat_obj) {
+        lv_obj_set_pos(bat_obj, 0, TRK_SCREEN_H - SIDE_H);
+    }
 
     /* 4: right panel (output + peak + link) */
     zmk_widget_track_output_init(&output_widget, screen);
     lv_obj_t *out_obj = zmk_widget_track_output_obj(&output_widget);
-    lv_obj_set_pos(out_obj, TRK_SCREEN_W - SIDE_W, TRK_SCREEN_H - SIDE_H);
+    if (out_obj) {
+        lv_obj_set_pos(out_obj, TRK_SCREEN_W - SIDE_W, TRK_SCREEN_H - SIDE_H);
+    }
 
 #if IS_ENABLED(CONFIG_PROSPECTOR_FPS_MONITOR)
     fps_label = lv_label_create(screen);
-    lv_label_set_text(fps_label, "-- FPS");
-    lv_obj_set_style_text_font(fps_label, &DINishCondensed_SemiBold_20, LV_PART_MAIN);
-    lv_obj_set_style_text_color(fps_label, lv_color_hex(0x00FF90), LV_PART_MAIN);
-    lv_obj_set_pos(fps_label, 218, 0);
-    lv_timer_create(fps_timer_cb, 120, NULL);
+    if (fps_label) {
+        lv_label_set_text(fps_label, "-- FPS");
+        lv_obj_set_style_text_font(fps_label, &DINishCondensed_SemiBold_20, LV_PART_MAIN);
+        lv_obj_set_style_text_color(fps_label, lv_color_hex(0x00FF90), LV_PART_MAIN);
+        lv_obj_set_pos(fps_label, 218, 0);
+        lv_timer_create(fps_timer_cb, 120, NULL);
+    }
 #endif
 
     start_boot_slide(top_obj, 0, -40, 0);

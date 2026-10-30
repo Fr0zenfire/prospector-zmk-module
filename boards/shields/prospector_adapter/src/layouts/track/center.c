@@ -75,12 +75,8 @@ static const struct {
     int16_t x;
     int16_t y;
 } curve_pts[] = {
-    {0, 86},   {5, 89},   {10, 92},  {15, 94},  {20, 96},
-    {25, 98},  {30, 100}, {35, 101}, {40, 103}, {45, 104},
-    {50, 104}, {55, 105}, {60, 106}, {65, 106}, {70, 106},
-    {75, 106}, {80, 106}, {85, 105}, {90, 104}, {95, 104},
-    {100, 103},{105, 101},{110, 100},{115, 98}, {120, 96},
-    {125, 94}, {130, 92}, {135, 89}, {140, 86}
+    {0, 86},   {12, 93},  {25, 98},  {38, 102}, {51, 105}, {64, 106},
+    {76, 106}, {89, 105}, {102, 102},{115, 98}, {128, 93}, {140, 86}
 };
 
 int zmk_widget_track_center_init(struct zmk_widget_track_center *widget, lv_obj_t *parent) {
@@ -109,21 +105,24 @@ int zmk_widget_track_center_init(struct zmk_widget_track_center *widget, lv_obj_
 
     /* TRACK pill -> layer name */
     widget->pill = trk_box(widget->obj);
-    lv_obj_set_size(widget->pill, PILL_W, PILL_H);
-    lv_obj_set_pos(widget->pill, (CENTER_W - PILL_W) / 2, PILL_Y);
-    lv_obj_set_style_radius(widget->pill, PILL_H / 2, LV_PART_MAIN);
-    lv_obj_set_style_bg_color(widget->pill, lv_color_hex(TRK_COLOR_PILL_TOP), LV_PART_MAIN);
-    lv_obj_set_style_bg_grad_color(widget->pill, lv_color_hex(TRK_COLOR_PILL_BOTTOM),
-                                   LV_PART_MAIN);
-    lv_obj_set_style_bg_grad_dir(widget->pill, LV_GRAD_DIR_VER, LV_PART_MAIN);
-    lv_obj_set_style_bg_opa(widget->pill, LV_OPA_COVER, LV_PART_MAIN);
+    if (widget->pill) {
+        lv_obj_set_size(widget->pill, PILL_W, PILL_H);
+        lv_obj_set_pos(widget->pill, (CENTER_W - PILL_W) / 2, PILL_Y);
+        lv_obj_set_style_radius(widget->pill, PILL_H / 2, LV_PART_MAIN);
+        lv_obj_set_style_bg_color(widget->pill, lv_color_hex(TRK_COLOR_PILL_TOP), LV_PART_MAIN);
+        lv_obj_set_style_bg_grad_color(widget->pill, lv_color_hex(TRK_COLOR_PILL_BOTTOM),
+                                       LV_PART_MAIN);
+        lv_obj_set_style_bg_grad_dir(widget->pill, LV_GRAD_DIR_VER, LV_PART_MAIN);
+        lv_obj_set_style_bg_opa(widget->pill, LV_OPA_COVER, LV_PART_MAIN);
+    }
 
-    widget->layer_label = trk_label(widget->pill, &DINishCondensed_SemiBold_20,
+    widget->layer_label = trk_label(widget->pill ? widget->pill : widget->obj,
+                                    &DINishCondensed_SemiBold_20,
                                     TRK_COLOR_PILL_TEXT, 0, 1, PILL_W, LV_TEXT_ALIGN_CENTER,
                                     "");
 
-    widget_track_center_layer_init();
     sys_slist_append(&widgets, &widget->node);
+    widget_track_center_layer_init();
 
     return 0;
 }

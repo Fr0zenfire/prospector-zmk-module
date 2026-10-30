@@ -64,28 +64,40 @@ static void render_battery(struct zmk_widget_track_battery *w, int i) {
 
     if (online && !battery_known[i]) {
         snprintf(text, sizeof(text), "--");
-        lv_obj_add_flag(w->fills[i], LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_style_border_color(w->frames[i], lv_color_hex(TRK_COLOR_GAUGE_FRAME),
-                                      LV_PART_MAIN);
+        if (w->fills[i]) {
+            lv_obj_add_flag(w->fills[i], LV_OBJ_FLAG_HIDDEN);
+        }
+        if (w->frames[i]) {
+            lv_obj_set_style_border_color(w->frames[i], lv_color_hex(TRK_COLOR_GAUGE_FRAME),
+                                          LV_PART_MAIN);
+        }
         lv_obj_set_style_text_color(w->pct_labels[i], lv_color_hex(TRK_COLOR_TEXT),
                                     LV_PART_MAIN);
     } else if (online) {
         snprintf(text, sizeof(text), "%u%%", (unsigned int)lvl);
         uint32_t fill = (lvl <= LOW_BATTERY) ? TRK_COLOR_GAUGE_LOW : TRK_COLOR_GAUGE_FILL;
         int width = ((L_BAR_W - 4) * lvl) / 100;
-        lv_obj_set_width(w->fills[i], width > 0 ? width : 1);
-        lv_obj_set_style_bg_color(w->fills[i], lv_color_hex(fill), LV_PART_MAIN);
-        lv_obj_clear_flag(w->fills[i], LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_style_border_color(w->frames[i], lv_color_hex(TRK_COLOR_GAUGE_FRAME),
-                                      LV_PART_MAIN);
+        if (w->fills[i]) {
+            lv_obj_set_width(w->fills[i], width > 0 ? width : 1);
+            lv_obj_set_style_bg_color(w->fills[i], lv_color_hex(fill), LV_PART_MAIN);
+            lv_obj_clear_flag(w->fills[i], LV_OBJ_FLAG_HIDDEN);
+        }
+        if (w->frames[i]) {
+            lv_obj_set_style_border_color(w->frames[i], lv_color_hex(TRK_COLOR_GAUGE_FRAME),
+                                          LV_PART_MAIN);
+        }
         lv_obj_set_style_text_color(w->pct_labels[i],
             lv_color_hex(lvl <= LOW_BATTERY ? TRK_COLOR_GAUGE_LOW : TRK_COLOR_TEXT),
             LV_PART_MAIN);
     } else {
         snprintf(text, sizeof(text), "--");
-        lv_obj_add_flag(w->fills[i], LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_style_border_color(w->frames[i], lv_color_hex(TRK_COLOR_BEZEL),
-                                      LV_PART_MAIN);
+        if (w->fills[i]) {
+            lv_obj_add_flag(w->fills[i], LV_OBJ_FLAG_HIDDEN);
+        }
+        if (w->frames[i]) {
+            lv_obj_set_style_border_color(w->frames[i], lv_color_hex(TRK_COLOR_BEZEL),
+                                          LV_PART_MAIN);
+        }
         lv_obj_set_style_text_color(w->pct_labels[i], lv_color_hex(TRK_COLOR_TEXT_DIM),
                                     LV_PART_MAIN);
     }
@@ -211,6 +223,8 @@ int zmk_widget_track_battery_init(struct zmk_widget_track_battery *widget, lv_ob
 
     for (int i = 0; i < TRK_MAX_PERIPHERALS; i++) {
         widget->pct_labels[i] = NULL;
+        widget->fills[i] = NULL;
+        widget->frames[i] = NULL;
     }
 
     for (int i = 0; i < PERIPHERAL_COUNT && i < 2; i++) {
@@ -232,11 +246,15 @@ int zmk_widget_track_battery_init(struct zmk_widget_track_battery *widget, lv_ob
                  TRK_COLOR_GAUGE_EMPTY);
         widget->fills[i] = trk_fill(widget->obj, L_X0 + 2, y + ROW_BAR_DY, 1, BAR_H - 2,
                                     TRK_COLOR_GAUGE_FILL);
-        lv_obj_add_flag(widget->fills[i], LV_OBJ_FLAG_HIDDEN);
+        if (widget->fills[i]) {
+            lv_obj_add_flag(widget->fills[i], LV_OBJ_FLAG_HIDDEN);
+        }
         widget->frames[i] = trk_gauge_frame(widget->obj, L_X0, y + ROW_BAR_DY - 2, L_BAR_W,
                                             BAR_H + 2);
-        lv_obj_set_style_border_color(widget->frames[i], lv_color_hex(TRK_COLOR_BEZEL),
-                                      LV_PART_MAIN);
+        if (widget->frames[i]) {
+            lv_obj_set_style_border_color(widget->frames[i], lv_color_hex(TRK_COLOR_BEZEL),
+                                          LV_PART_MAIN);
+        }
     }
 
     /* bezel line meeting the curved line in the centre */
@@ -247,6 +265,8 @@ int zmk_widget_track_battery_init(struct zmk_widget_track_battery *widget, lv_ob
     widget->odo_label = trk_label(widget->obj, &DINishCondensed_SemiBold_20, TRK_COLOR_TEXT,
                                   36, BOTTOM_Y, 0, LV_TEXT_ALIGN_LEFT, "0");
 
+    sys_slist_append(&battery_widgets, &widget->node);
+
     for (int i = 0; i < PERIPHERAL_COUNT; i++) {
         render_battery(widget, i);
     }
@@ -254,8 +274,6 @@ int zmk_widget_track_battery_init(struct zmk_widget_track_battery *widget, lv_ob
     widget_track_battery_init();
     widget_track_split_link_init();
     widget_track_odo_init();
-
-    sys_slist_append(&battery_widgets, &widget->node);
 
     return 0;
 }
@@ -304,25 +322,20 @@ static void update_output_widget(struct zmk_widget_track_output *w) {
     }
 
     uint32_t lamp;
-    const char *icon;
     const char *text;
     if (usb) {
         lamp = TRK_COLOR_LINK_USB;
-        icon = LV_SYMBOL_USB;
         text = "USB";
     } else if (active_profile_connected) {
         lamp = TRK_COLOR_LINK_OK;
-        icon = LV_SYMBOL_BLUETOOTH;
-        text = "LINK";
+        text = "BT OK";
     } else {
         lamp = TRK_COLOR_LINK_WARN;
-        icon = LV_SYMBOL_BLUETOOTH;
-        text = "OFF";
+        text = "BT OFF";
     }
 
     if (w->link_icon) {
-        lv_label_set_text(w->link_icon, icon);
-        lv_obj_set_style_text_color(w->link_icon, lv_color_hex(lamp), LV_PART_MAIN);
+        lv_obj_add_flag(w->link_icon, LV_OBJ_FLAG_HIDDEN);
     }
     if (w->link_label) {
         lv_label_set_text(w->link_label, text);
@@ -391,12 +404,17 @@ int zmk_widget_track_output_init(struct zmk_widget_track_output *widget, lv_obj_
     trk_fill(widget->obj, 0, BEZEL_Y, SIDE_W, 2, TRK_COLOR_BEZEL);
 
     /* Link telltale */
-    widget->link_icon = lv_label_create(widget->obj);
-    lv_obj_set_pos(widget->link_icon, R_X0, BOTTOM_Y);
-    lv_label_set_text(widget->link_icon, LV_SYMBOL_BLUETOOTH);
+    widget->link_icon = NULL;
     widget->link_label = trk_label(widget->obj, &DINishCondensed_SemiBold_20,
-                                   TRK_COLOR_LINK_WARN, R_X0 + 24, BOTTOM_Y, R_BAR_W - 24,
-                                   LV_TEXT_ALIGN_RIGHT, "OFF");
+                                   TRK_COLOR_LINK_WARN, R_X0, BOTTOM_Y, R_BAR_W,
+                                   LV_TEXT_ALIGN_RIGHT, "BT OFF");
+
+    if (sys_slist_is_empty(&output_widgets)) {
+        active_profile_index = zmk_ble_active_profile_index();
+        active_profile_connected = zmk_ble_active_profile_is_connected();
+        struct zmk_endpoint_instance selected = zmk_endpoint_get_selected();
+        active_transport = selected.transport;
+    }
 
     update_output_widget(widget);
     sys_slist_append(&output_widgets, &widget->node);

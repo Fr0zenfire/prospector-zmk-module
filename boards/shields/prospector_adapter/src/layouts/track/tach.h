@@ -6,7 +6,7 @@
 #define TACH_W 280
 #define TACH_H 112
 
-#define TRK_BAR_COUNT 38
+#define TRK_BAR_COUNT 26
 
 struct zmk_widget_track_tach {
     sys_snode_t node;
