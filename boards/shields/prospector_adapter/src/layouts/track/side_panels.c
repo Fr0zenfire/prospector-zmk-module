@@ -325,6 +325,10 @@ static struct odo_state odo_get_state(const zmk_event_t *eh) {
 ZMK_DISPLAY_WIDGET_LISTENER(widget_track_odo, struct odo_state, odo_update_cb, odo_get_state)
 ZMK_SUBSCRIPTION(widget_track_odo, zmk_keycode_state_changed);
 
+static void set_odo_opa(void *obj, int32_t v) {
+    lv_obj_set_style_opa((lv_obj_t *)obj, (lv_opa_t)v, LV_PART_MAIN);
+}
+
 int zmk_widget_track_battery_init(struct zmk_widget_track_battery *widget, lv_obj_t *parent) {
     widget->obj = trk_box(parent);
     lv_obj_set_size(widget->obj, SIDE_W, SIDE_H);
@@ -360,10 +364,40 @@ int zmk_widget_track_battery_init(struct zmk_widget_track_battery *widget, lv_ob
     /* bezel line meeting the curved line in the centre */
     trk_fill(widget->obj, L_X0, BEZEL_Y, SIDE_W - L_X0, 2, TRK_COLOR_BEZEL);
 
-    trk_label(widget->obj, &lv_font_montserrat_12, TRK_COLOR_TEXT_DIM, 12, 96, 0,
-              LV_TEXT_ALIGN_LEFT, "ODO");
-    widget->odo_label = trk_label(widget->obj, &DINishCondensed_SemiBold_20, TRK_COLOR_TEXT,
-                                  38, 90, 0, LV_TEXT_ALIGN_LEFT, "0");
+    /* ODO title and count cross-fade: "ODO" pops up on entry, fades out, and count fades in */
+    lv_obj_t *odo_title = trk_label(widget->obj, &DINishCondensed_SemiBold_20,
+                                    TRK_COLOR_TEXT_DIM, 14, BOTTOM_Y, 52,
+                                    LV_TEXT_ALIGN_CENTER, "ODO");
+    widget->odo_label = trk_label(widget->obj, &DINishCondensed_SemiBold_20,
+                                  TRK_COLOR_TEXT, 14, BOTTOM_Y, 52,
+                                  LV_TEXT_ALIGN_CENTER, "0");
+    if (widget->odo_label) {
+        lv_obj_set_style_opa(widget->odo_label, LV_OPA_TRANSP, LV_PART_MAIN);
+    }
+
+    if (odo_title) {
+        lv_anim_t a;
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, odo_title);
+        lv_anim_set_values(&a, 255, 0);
+        lv_anim_set_duration(&a, 350);
+        lv_anim_set_delay(&a, 1200);
+        lv_anim_set_exec_cb(&a, set_odo_opa);
+        lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
+        lv_anim_start(&a);
+    }
+
+    if (widget->odo_label) {
+        lv_anim_t a;
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, widget->odo_label);
+        lv_anim_set_values(&a, 0, 255);
+        lv_anim_set_duration(&a, 350);
+        lv_anim_set_delay(&a, 1500);
+        lv_anim_set_exec_cb(&a, set_odo_opa);
+        lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
+        lv_anim_start(&a);
+    }
 
     sys_slist_append(&battery_widgets, &widget->node);
 
