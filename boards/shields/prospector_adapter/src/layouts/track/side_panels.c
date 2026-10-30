@@ -23,6 +23,7 @@
 #include <zmk/events/keycode_state_changed.h>
 #include <zmk/events/split_central_status_changed.h>
 
+#include <symbols.h>
 #include "display_colors.h"
 #include "track_common.h"
 
@@ -35,7 +36,7 @@
 #define ROW_BAR_DY  21
 #define BAR_H       10
 #define BEZEL_Y     86
-#define BOTTOM_Y    96
+#define BOTTOM_Y    92
 
 #define BATT_ROW_Y0 11
 #define OUT_ROW_Y   27
@@ -44,8 +45,8 @@
 /*  Left panel: battery gauges + odometer                                      */
 /* ========================================================================== */
 
-#define L_X0    4
-#define L_BAR_W 60
+#define L_X0    8
+#define L_BAR_W 56
 
 static sys_slist_t battery_widgets = SYS_SLIST_STATIC_INIT(&battery_widgets);
 
@@ -74,7 +75,7 @@ static void render_battery(struct zmk_widget_track_battery *w, int i) {
         lv_obj_set_style_text_color(w->pct_labels[i], lv_color_hex(TRK_COLOR_TEXT),
                                     LV_PART_MAIN);
     } else if (online) {
-        snprintf(text, sizeof(text), "%u%%", (unsigned int)lvl);
+        snprintf(text, sizeof(text), "%u", (unsigned int)lvl);
         uint32_t fill = (lvl <= LOW_BATTERY) ? TRK_COLOR_GAUGE_LOW : TRK_COLOR_GAUGE_FILL;
         int width = ((L_BAR_W - 4) * lvl) / 100;
         if (w->fills[i]) {
@@ -258,12 +259,12 @@ int zmk_widget_track_battery_init(struct zmk_widget_track_battery *widget, lv_ob
     }
 
     /* bezel line meeting the curved line in the centre */
-    trk_fill(widget->obj, 0, BEZEL_Y, SIDE_W, 2, TRK_COLOR_BEZEL);
+    trk_fill(widget->obj, L_X0, BEZEL_Y, SIDE_W - L_X0, 2, TRK_COLOR_BEZEL);
 
-    trk_label(widget->obj, &DINishCondensed_SemiBold_20, TRK_COLOR_TEXT_DIM, 2, BOTTOM_Y, 0,
+    trk_label(widget->obj, &DINishCondensed_SemiBold_20, TRK_COLOR_TEXT_DIM, 16, BOTTOM_Y, 0,
               LV_TEXT_ALIGN_LEFT, "ODO");
     widget->odo_label = trk_label(widget->obj, &DINishCondensed_SemiBold_20, TRK_COLOR_TEXT,
-                                  36, BOTTOM_Y, 0, LV_TEXT_ALIGN_LEFT, "0");
+                                  48, BOTTOM_Y, 0, LV_TEXT_ALIGN_LEFT, "0");
 
     sys_slist_append(&battery_widgets, &widget->node);
 
@@ -287,7 +288,7 @@ lv_obj_t *zmk_widget_track_battery_obj(struct zmk_widget_track_battery *widget) 
 /* ========================================================================== */
 
 #define R_X0    6
-#define R_BAR_W 60
+#define R_BAR_W 56
 #define CELL_GAP 2
 
 static sys_slist_t output_widgets = SYS_SLIST_STATIC_INIT(&output_widgets);
@@ -328,10 +329,10 @@ static void update_output_widget(struct zmk_widget_track_output *w) {
         text = "USB";
     } else if (active_profile_connected) {
         lamp = TRK_COLOR_LINK_OK;
-        text = "BT OK";
+        text = "BT";
     } else {
         lamp = TRK_COLOR_LINK_WARN;
-        text = "BT OFF";
+        text = "BT";
     }
 
     if (w->link_icon) {
@@ -381,12 +382,11 @@ int zmk_widget_track_output_init(struct zmk_widget_track_output *widget, lv_obj_
     widget->obj = trk_box(parent);
     lv_obj_set_size(widget->obj, SIDE_W, SIDE_H);
 
-    /* Row 1: transport + profile */
-    widget->transport_label = trk_label(widget->obj, &DINishCondensed_SemiBold_20,
-                                        TRK_COLOR_TEXT, R_X0, OUT_ROW_Y, 0, LV_TEXT_ALIGN_LEFT, "BLE");
-    widget->profile_label = trk_label(widget->obj, &DINishCondensed_SemiBold_20,
-                                      TRK_COLOR_TEXT, R_X0 + 30, OUT_ROW_Y, R_BAR_W - 30,
-                                      LV_TEXT_ALIGN_RIGHT, "P1");
+    /* Row 1: static connection icon */
+    widget->transport_label = NULL;
+    widget->profile_label = NULL;
+    trk_label(widget->obj, &Symbols_Regular_28, TRK_COLOR_TEXT, R_X0, OUT_ROW_Y - 7, R_BAR_W,
+              LV_TEXT_ALIGN_CENTER, SYMBOL_WAVES_UP);
 
     /* Fuel-gauge style profile cells */
     int inner = R_BAR_W - 4;
@@ -401,13 +401,13 @@ int zmk_widget_track_output_init(struct zmk_widget_track_output *widget, lv_obj_
     trk_gauge_frame(widget->obj, R_X0, OUT_ROW_Y + ROW_BAR_DY - 2, R_BAR_W, BAR_H + 2);
 
     /* bezel line meeting the centre cluster */
-    trk_fill(widget->obj, 0, BEZEL_Y, SIDE_W, 2, TRK_COLOR_BEZEL);
+    trk_fill(widget->obj, 0, BEZEL_Y, R_X0 + R_BAR_W, 2, TRK_COLOR_BEZEL);
 
     /* Link telltale */
     widget->link_icon = NULL;
     widget->link_label = trk_label(widget->obj, &DINishCondensed_SemiBold_20,
-                                   TRK_COLOR_LINK_WARN, R_X0, BOTTOM_Y, R_BAR_W,
-                                   LV_TEXT_ALIGN_RIGHT, "BT OFF");
+                                   TRK_COLOR_LINK_WARN, 0, BOTTOM_Y, 54,
+                                   LV_TEXT_ALIGN_RIGHT, "BT");
 
     if (sys_slist_is_empty(&output_widgets)) {
         active_profile_index = zmk_ble_active_profile_index();

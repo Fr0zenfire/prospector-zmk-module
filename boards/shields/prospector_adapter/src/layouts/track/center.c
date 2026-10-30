@@ -17,9 +17,10 @@
 #include "display_colors.h"
 #include "track_common.h"
 
-#define PILL_W 104
-#define PILL_H 24
-#define PILL_Y 62
+#define PILL_W      116
+#define PILL_H      25
+#define PILL_Y      64
+#define PILL_DISC_D 168
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
 
@@ -103,17 +104,25 @@ int zmk_widget_track_center_init(struct zmk_widget_track_center *widget, lv_obj_
     trk_label(widget->obj, &DINishCondensed_SemiBold_20, TRK_COLOR_TEXT, 102, 36, 0,
               LV_TEXT_ALIGN_LEFT, "WPM");
 
-    /* TRACK pill -> layer name */
+    /* TRACK curved bottom badge -> layer name */
     widget->pill = trk_box(widget->obj);
     if (widget->pill) {
         lv_obj_set_size(widget->pill, PILL_W, PILL_H);
         lv_obj_set_pos(widget->pill, (CENTER_W - PILL_W) / 2, PILL_Y);
-        lv_obj_set_style_radius(widget->pill, PILL_H / 2, LV_PART_MAIN);
-        lv_obj_set_style_bg_color(widget->pill, lv_color_hex(TRK_COLOR_PILL_TOP), LV_PART_MAIN);
-        lv_obj_set_style_bg_grad_color(widget->pill, lv_color_hex(TRK_COLOR_PILL_BOTTOM),
-                                       LV_PART_MAIN);
-        lv_obj_set_style_bg_grad_dir(widget->pill, LV_GRAD_DIR_VER, LV_PART_MAIN);
-        lv_obj_set_style_bg_opa(widget->pill, LV_OPA_COVER, LV_PART_MAIN);
+
+        lv_obj_t *disc = trk_box(widget->pill);
+        if (disc) {
+            lv_obj_set_size(disc, PILL_DISC_D, PILL_DISC_D);
+            lv_obj_set_pos(disc, (PILL_W - PILL_DISC_D) / 2, PILL_H - PILL_DISC_D);
+            lv_obj_set_style_radius(disc, PILL_DISC_D / 2, LV_PART_MAIN);
+            lv_obj_set_style_bg_color(disc, lv_color_hex(TRK_COLOR_PILL_TOP), LV_PART_MAIN);
+            lv_obj_set_style_bg_grad_color(disc, lv_color_hex(TRK_COLOR_PILL_BOTTOM),
+                                           LV_PART_MAIN);
+            lv_obj_set_style_bg_grad_dir(disc, LV_GRAD_DIR_VER, LV_PART_MAIN);
+            lv_obj_set_style_bg_main_stop(disc, 216, LV_PART_MAIN);
+            lv_obj_set_style_bg_grad_stop(disc, 255, LV_PART_MAIN);
+            lv_obj_set_style_bg_opa(disc, LV_OPA_COVER, LV_PART_MAIN);
+        }
     }
 
     widget->layer_label = trk_label(widget->pill ? widget->pill : widget->obj,

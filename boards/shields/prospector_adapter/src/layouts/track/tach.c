@@ -20,7 +20,7 @@
 #include "track_common.h"
 
 #define BAR_COUNT   TRK_BAR_COUNT
-#define BAR_W       8
+#define BAR_W       7
 #define BAR_GAP     2
 #define BAR_PITCH   (BAR_W + BAR_GAP)
 #define BAR_SPAN    (BAR_COUNT * BAR_PITCH - BAR_GAP)
@@ -28,7 +28,7 @@
 #define BAR_BOTTOM  84
 #define BAR_H_MIN   16
 #define BAR_H_MAX   52
-#define RAMP_GAP    4
+#define RAMP_GAP    2
 
 #define LOW_BARS    4   /* segments used by compressed 0..LOW_WPM */
 #define LOW_WPM     40
@@ -193,7 +193,7 @@ ZMK_SUBSCRIPTION(widget_track_tach, zmk_wpm_state_changed);
 static void add_scale_numeral(lv_obj_t *parent, int wpm, const char *text) {
     int cx = bar_x(0) + (int)(wpm_to_pos((float)wpm) * BAR_PITCH);
     int line_h = lv_font_get_line_height(&DINish_Medium_24);
-    int y = ramp_y(cx) - 2 - line_h;
+    int y = ramp_y(cx) - 3 - line_h;
     trk_label(parent, &DINish_Medium_24, TRK_COLOR_TEXT, cx - 15, y, 30, LV_TEXT_ALIGN_CENTER,
               text);
 }
@@ -232,15 +232,13 @@ int zmk_widget_track_tach_init(struct zmk_widget_track_tach *widget, lv_obj_t *p
         lv_obj_add_flag(widget->peak_bar, LV_OBJ_FLAG_HIDDEN);
     }
 
-    /* Sloped ramp line segments (stepped across 4 bars each) */
-    for (int i = 0; i < BAR_COUNT; i += 4) {
-        int count = (i + 4 <= BAR_COUNT) ? 4 : (BAR_COUNT - i);
-        int mid = i + count / 2;
+    /* Sloped diagonal ramp line below the numbers (1 segment per bar, continuous across gaps) */
+    for (int i = 0; i < BAR_COUNT; i++) {
         uint32_t rcolor = (bar_zone[i] == ZONE_RED) ? TRK_COLOR_RED_ON
                          : (bar_zone[i] == ZONE_AMBER) ? TRK_COLOR_AMBER_ON
                          : TRK_COLOR_RAMP;
-        trk_fill(widget->obj, bar_x(i), BAR_BOTTOM - bar_h(mid) - RAMP_GAP,
-                 count * BAR_PITCH - BAR_GAP, 2, rcolor);
+        int seg_w = (i < BAR_COUNT - 1) ? BAR_PITCH : BAR_W;
+        trk_fill(widget->obj, bar_x(i), BAR_BOTTOM - bar_h(i) - RAMP_GAP, seg_w, 2, rcolor);
     }
 
     /* Baseline under bars: normal, amber, red */
@@ -248,7 +246,7 @@ int zmk_widget_track_tach_init(struct zmk_widget_track_tach *widget, lv_obj_t *p
     int x_amber = bar_x(amber_first) - 1;
     int x_red = bar_x(red_first) - 1;
     int x_end = bar_x(BAR_COUNT - 1) + BAR_W;
-    int base_y = BAR_BOTTOM + 2;
+    int base_y = BAR_BOTTOM;
     if (x_amber > x_end) x_amber = x_end;
     if (x_red > x_end) x_red = x_end;
 

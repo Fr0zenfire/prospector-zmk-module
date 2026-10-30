@@ -19,7 +19,8 @@
 #include "display_colors.h"
 #include "track_common.h"
 
-#define LAMP_W 64
+#define LAMP_W      52
+#define TELL_INSET  26
 
 static sys_slist_t widgets = SYS_SLIST_STATIC_INIT(&widgets);
 
@@ -97,9 +98,10 @@ int zmk_widget_track_telltales_init(struct zmk_widget_track_telltales *widget,
     widget->obj = trk_box(parent);
     lv_obj_set_size(widget->obj, TELLTALE_W, TELLTALE_H);
 
-    int pitch = TELLTALE_W / 4;
+    int span = TELLTALE_W - 2 * TELL_INSET; /* 228px */
+    int pitch = span / 4;                   /* 57px */
     for (int i = 0; i < 4; i++) {
-        int cx = pitch / 2 + i * pitch;
+        int cx = TELL_INSET + pitch / 2 + i * pitch;
         widget->labels[i] = trk_label(widget->obj, &DINishCondensed_SemiBold_20,
                                       TRK_COLOR_TELL_OFF, cx - LAMP_W / 2, 0, LAMP_W,
                                       LV_TEXT_ALIGN_CENTER, modifier_order_get_text(i));

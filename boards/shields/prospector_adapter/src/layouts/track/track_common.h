@@ -6,6 +6,7 @@
 LV_FONT_DECLARE(DINish_Medium_24);            /* digits + '-' only: tach scale */
 LV_FONT_DECLARE(DINishCondensed_SemiBold_20); /* full ASCII: labels           */
 LV_FONT_DECLARE(FR_Regular_48);               /* full ASCII: big WPM readout  */
+LV_FONT_DECLARE(Symbols_Regular_28);          /* symbol glyphs                 */
 
 /* Screen geometry (landscape) */
 #define TRK_SCREEN_W 280
