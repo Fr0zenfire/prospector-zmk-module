@@ -10,6 +10,9 @@ LOG_MODULE_REGISTER(display_idle, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/event_manager.h>
 #include <zmk/events/keycode_state_changed.h>
 #include <zmk/events/position_state_changed.h>
+#include <zmk/events/split_central_status_changed.h>
+#include <zmk/events/battery_state_changed.h>
+#include <zmk/ble.h>
 #if IS_ENABLED(CONFIG_ZMK_KEYMAP_SENSORS)
 #include <zmk/events/sensor_event.h>
 #endif
@@ -304,9 +307,33 @@ bool prospector_display_just_woke(void) {
     return (k_uptime_get() - last_wake_uptime_ms) < 250;
 }
 
+#if defined(ZMK_SPLIT_BLE_PERIPHERAL_COUNT) && (ZMK_SPLIT_BLE_PERIPHERAL_COUNT > 0)
+static bool peripheral_connected[ZMK_SPLIT_BLE_PERIPHERAL_COUNT];
+
+static bool any_peripheral_connected(void) {
+    for (int i = 0; i < ZMK_SPLIT_BLE_PERIPHERAL_COUNT; i++) {
+        if (peripheral_connected[i]) {
+            return true;
+        }
+    }
+    return false;
+}
+#else
+static bool any_peripheral_connected(void) { return true; }
+#endif
+
+static uint32_t current_idle_timeout_ms(void) {
+#if defined(CONFIG_PROSPECTOR_DISPLAY_DISCONNECTED_TIMEOUT_MS)
+    if (!any_peripheral_connected()) {
+        return CONFIG_PROSPECTOR_DISPLAY_DISCONNECTED_TIMEOUT_MS;
+    }
+#endif
+    return CONFIG_PROSPECTOR_DISPLAY_IDLE_TIMEOUT_MS;
+}
+
 void prospector_display_notify_activity(void) {
 #if IS_ENABLED(CONFIG_PROSPECTOR_DISPLAY_SLEEP_ENABLE)
-    k_work_reschedule(&idle_work, K_MSEC(CONFIG_PROSPECTOR_DISPLAY_IDLE_TIMEOUT_MS));
+    k_work_reschedule(&idle_work, K_MSEC(current_idle_timeout_ms()));
 #endif
 }
 
@@ -384,7 +411,7 @@ static int display_idle_init(const struct device *unused) {
     k_work_init(&wake_anim_work, wake_anim_work_handler);
 
 #if IS_ENABLED(CONFIG_PROSPECTOR_DISPLAY_SLEEP_ENABLE)
-    k_work_schedule(&idle_work, K_MSEC(CONFIG_PROSPECTOR_DISPLAY_IDLE_TIMEOUT_MS));
+    k_work_schedule(&idle_work, K_MSEC(current_idle_timeout_ms()));
 #endif
 
     return 0;
@@ -395,6 +422,36 @@ static int on_any_key_event(const zmk_event_t *eh) {
     if (!IS_ENABLED(CONFIG_PROSPECTOR_DISPLAY_SLEEP_ENABLE)) {
         return ZMK_EV_EVENT_BUBBLE;
     }
+
+#if defined(ZMK_SPLIT_BLE_PERIPHERAL_COUNT) && (ZMK_SPLIT_BLE_PERIPHERAL_COUNT > 0)
+    const struct zmk_split_central_status_changed *split_ev =
+        as_zmk_split_central_status_changed(eh);
+    if (split_ev) {
+        if (split_ev->slot < ZMK_SPLIT_BLE_PERIPHERAL_COUNT) {
+            peripheral_connected[split_ev->slot] = split_ev->connected;
+            if (split_ev->connected) {
+                prospector_display_wake_up();
+            } else if (!any_peripheral_connected() && !prospector_display_is_sleeping()) {
+                k_work_reschedule(&idle_work, K_MSEC(current_idle_timeout_ms()));
+            }
+        }
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+
+    const struct zmk_peripheral_battery_state_changed *batt_ev =
+        as_zmk_peripheral_battery_state_changed(eh);
+    if (batt_ev) {
+        if (batt_ev->source < ZMK_SPLIT_BLE_PERIPHERAL_COUNT) {
+            if (!peripheral_connected[batt_ev->source]) {
+                peripheral_connected[batt_ev->source] = true;
+                if (!prospector_display_is_sleeping()) {
+                    prospector_display_notify_activity();
+                }
+            }
+        }
+        return ZMK_EV_EVENT_BUBBLE;
+    }
+#endif
 
     const struct zmk_keycode_state_changed *kc = as_zmk_keycode_state_changed(eh);
     const struct zmk_position_state_changed *pos = as_zmk_position_state_changed(eh);
@@ -425,4 +482,8 @@ ZMK_SUBSCRIPTION(prospector_display_idle, zmk_keycode_state_changed);
 ZMK_SUBSCRIPTION(prospector_display_idle, zmk_position_state_changed);
 #if IS_ENABLED(CONFIG_ZMK_KEYMAP_SENSORS)
 ZMK_SUBSCRIPTION(prospector_display_idle, zmk_sensor_event);
+#endif
+#if defined(ZMK_SPLIT_BLE_PERIPHERAL_COUNT) && (ZMK_SPLIT_BLE_PERIPHERAL_COUNT > 0)
+ZMK_SUBSCRIPTION(prospector_display_idle, zmk_split_central_status_changed);
+ZMK_SUBSCRIPTION(prospector_display_idle, zmk_peripheral_battery_state_changed);
 #endif

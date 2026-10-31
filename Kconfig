@@ -114,6 +114,11 @@ config PROSPECTOR_DISPLAY_IDLE_TIMEOUT_MS
     default 30000
     depends on PROSPECTOR_DISPLAY_SLEEP_ENABLE
 
+config PROSPECTOR_DISPLAY_DISCONNECTED_TIMEOUT_MS
+    int "Display idle timeout in ms when all split peripherals are disconnected"
+    default 30000
+    depends on PROSPECTOR_DISPLAY_SLEEP_ENABLE
+
 config PROSPECTOR_DISPLAY_SLEEP_USE_PM
     bool "Use Zephyr PM to suspend the display (SLEEP_IN)"
     default n
