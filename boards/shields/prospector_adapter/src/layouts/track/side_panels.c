@@ -223,8 +223,12 @@ static void battery_update_cb(struct battery_state s) {
         return;
     }
     battery_level[s.source] = s.level;
-    battery_known[s.source] = true;
-    battery_connected[s.source] = true;
+    if (s.level > 0) {
+        battery_known[s.source] = true;
+        battery_connected[s.source] = true;
+    } else {
+        battery_connected[s.source] = false;
+    }
 
     struct zmk_widget_track_battery *w;
     SYS_SLIST_FOR_EACH_CONTAINER(&battery_widgets, w, node) {

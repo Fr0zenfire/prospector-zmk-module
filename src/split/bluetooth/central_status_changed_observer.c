@@ -167,10 +167,13 @@ static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {
 
     LOG_DBG("Disconnected: %s (reason %d)", addr_str, reason);
 
-    raise_zmk_split_central_status_changed((struct zmk_split_central_status_changed){
-        .slot = psptr_peripheral_slot_index_for_conn(conn),
-        .connected = false,
-    });
+    int slot_idx = psptr_peripheral_slot_index_for_conn(conn);
+    if (slot_idx >= 0) {
+        raise_zmk_split_central_status_changed((struct zmk_split_central_status_changed){
+            .slot = slot_idx,
+            .connected = false,
+        });
+    }
 
     // k_msleep(100);
 

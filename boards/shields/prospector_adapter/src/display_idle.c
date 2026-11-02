@@ -442,10 +442,17 @@ static int on_any_key_event(const zmk_event_t *eh) {
         as_zmk_peripheral_battery_state_changed(eh);
     if (batt_ev) {
         if (batt_ev->source < ZMK_SPLIT_BLE_PERIPHERAL_COUNT) {
-            if (!peripheral_connected[batt_ev->source]) {
-                peripheral_connected[batt_ev->source] = true;
-                if (!prospector_display_is_sleeping()) {
-                    prospector_display_notify_activity();
+            if (batt_ev->state_of_charge > 0) {
+                if (!peripheral_connected[batt_ev->source]) {
+                    peripheral_connected[batt_ev->source] = true;
+                    prospector_display_wake_up();
+                }
+            } else {
+                if (peripheral_connected[batt_ev->source]) {
+                    peripheral_connected[batt_ev->source] = false;
+                    if (!any_peripheral_connected() && !prospector_display_is_sleeping()) {
+                        k_work_reschedule(&idle_work, K_MSEC(current_idle_timeout_ms()));
+                    }
                 }
             }
         }
